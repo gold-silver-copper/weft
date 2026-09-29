@@ -4,7 +4,7 @@ The run that built weft against `docs/design/0002-improve-ecs.md`, on branch `im
 
 ## Claims
 
-Checked on the final tree, cold (`cargo clean` first): `cargo test --workspace` passed every test binary and doctest in 12 s including the build; both clippy runs passed; rust-analyzer as below.
+Checked on the final tree, cold (`cargo clean` first): `cargo test --workspace` passed every test binary and doctest in 17 s including the build; both clippy runs passed; rust-analyzer as below.
 
 | id | claim | status | gates, as run |
 |---|---|---|---|
@@ -14,7 +14,7 @@ Checked on the final tree, cold (`cargo clean` first): `cargo test --workspace` 
 | C4 | a two-way relation is one fact, read correctly from both ends | green | `one_way_door` (E0277); `fuzz::differential`; `back_reads_forward_label` killed |
 | C5 | forbidden cycles don't compile | green | `chest_in_itself`, `chest_in_its_contents` (E0277, "the relation is ranked, and ranks must rise"), `room_in_item` (E0277), `overlap_without_loop_rule` (E0080 at `game!`), `refused_has_no_cycle` (E0599), all under `cargo check` |
 | C6 | reads are total: no fallback, no `Default` | green | `kind_without_default` builds and runs; `index_through_set` (E0277); `fuzz::differential` |
-| C7 | a hook reaches what its bound names; callers carry the bound | green | `caller_lacks_hook_bound`, `hook_overasks` (E0277); `mutual_hooks` builds, settles and runs; P7's `pick_up` asserts hold |
+| C7 | a hook reaches what its bound names; callers carry the bound | green | `caller_lacks_hook_bound`, `hook_overasks` (E0277); `mutual_hooks` builds, settles and runs; P7's `pick_up` asserts hold; also `code_needs_a_missing_module` (E0277, D6) |
 | C8 | a hook chain that never settles is refused | green | `fuzz::hooks_settle`: a linear and a doubling chain both refused, no overflow, well inside the time budget |
 | C9 | `cast` compares no strings | green | `claims::cast_matrix`; `cast_outside_set` (E0277); `cast_by_string` killed |
 | C10 | relation endpoints are typed | green | `wrong_endpoint` (E0277) |
@@ -23,7 +23,7 @@ Checked on the final tree, cold (`cargo clean` first): `cargo test --workspace` 
 | C13 | a module from another crate drops into a downstream `game!` | green | `module_from_another_crate`: membership declared upstream (`Bag`) and downstream (`Room`), no E0119; builds and runs |
 | C14 | everything infers | green | `rust-analyzer analysis-stats .`: `exprs: 31062, ??ty: 0, ?ty: 0`; `pats: 4875, ??ty: 0, ?ty: 0` (after D5) |
 | C15 | no `unsafe`, no dependencies, no library panics, no runtime type lookup | green | `cargo clippy -p weft --lib -- -D warnings` passes under the af02049 forbid wall; `lint_wall_is_intact`, `no_third_party_crates`, `source_is_clean` pass |
-| C16 | P1–P7 compile and behave as written | green | `programs::every_program_runs` (every promised line, in order); `cargo test -p game`: 4 tests, including the exact snapshot, and 11 `compile_fail` doctests with their stated codes |
+| C16 | P1–P7 compile and behave as written | green | `programs::every_program_runs` (every promised line, in order); `cargo test -p game`: 4 tests, including the exact snapshot, and 11 `compile_fail` doctests with their stated codes; every line P3, P6 and P7 comment out fails with E0277 when uncommented, and each has a reject case or doctest (D6) |
 | C17 | dropping a world drops everything it ever spawned | green | `claims::drop_frees_everything`, including despawned entities and a 20,000-move edge history |
 | C18 | the gates can fail | green | every twin compiles; the wrong-code canary fails; the fuzzer catches its planted fault (`seed 1, turn 17: is_doomed(14)`); all three mutants killed as test failures |
 | C19 | every change after M0 is recorded | green | `deviations::nothing_changed_without_a_pin`, `every_record_claim_is_kept_or_logged`, and the other four P8 tests |
@@ -37,6 +37,7 @@ The fuzzer's run: 60 worlds x 30 turns, the world matched the model after every 
 - **D3**: M1–M5 landed as one library commit, because the M0 gates share P5's `game` crate and couldn't turn a claim green before most of the API existed.
 - **D4**: semantics the record left open: `spill` with nowhere to land despawns, hook chains have a depth limit and budget (`Refused::Unsettled`), spawn fallibility follows `refuse` and hooks, `<->` is `many` only, and `one` edges may not form an ownership loop over kinds (at most 128 kinds per game).
 - **D5**: ranks are Peano types, not const generics, because rust-analyzer can't type a const-generic literal; this drops `generic_const_exprs` and changes how P3, P5, P6 and P7 spell ranks (`Chest<R>` with a `rank: R` field, `Chest<R1>`).
+- **D6**: two more reject cases, for the invalid states P6 and P7 comment out that no case covered (a module-bounded call for a game without the module; `target` through a set handle), plus clearer messages for `Kind`, `Member` and `Carries`.
 
 ## Reopen triggers
 

@@ -67,3 +67,23 @@ repro (no dependencies):  pub struct Chest<const R: u8> { pub id: u32 }  fn main
   rust-analyzer 1.100.0-nightly (bba531001 2026-09-20):  exprs: 6, ??ty: 1
   rust-analyzer 1.98.1 (48a229ce 2026-09-01):            exprs: 6, ??ty: 1
 ```
+
+## D6: Two more reject cases, for commented-out states no case covered
+- Kind: deviation
+- Files: tests/reject/src/bin/code_needs_a_missing_module.rs, tests/reject/src/bin/target_through_set.rs
+- Pins: tests/reject/src/bin/code_needs_a_missing_module.rs 001c7c6aac17663c, tests/reject/src/bin/target_through_set.rs a26de8e1ae280f46
+- Claims: C7, C16
+- Why: Acceptance asks that every invalid state P1–P8 comment out be rejected by the reject cases or P5's doctests. Uncommenting each such line showed every one fails with E0277 as its comment says, but two had no case: P6's `play(&mut quiet, &[], haunt::<Quiet>)` (code bounded by a module, called for a game without it) and P7's `t.target::<At>(walkers[0])` (reading a `one` edge through a set handle). The two new cases pin them down, with twins. The same check led to `on_unimplemented` messages on `Kind`, `Member` and `Carries` in the library ("`Room` isn't a `Thing`", "`Holder` isn't a kind", "`Walker` doesn't carry a `At` edge"), which change no error code.
+- Evidence: each commented-out line of P3, P6 and P7, uncommented in a scratch example.
+
+```text
+p3:97  E0277 `Chest<Up<Up<Zero>>>` doesn't fit in `Chest<Up<Up<Zero>>>`: the relation is ranked, and ranks must rise
+p3:98  E0277 `Chest<Up<Up<Zero>>>` doesn't fit in `Chest<Up<Zero>>`: the relation is ranked, and ranks must rise
+p3:99  E0277 `Room` isn't a `Thing`
+p3:100 E0277 `In` is `one`: move its edge with `relate`; it can't be dropped
+p6:178 E0277 the trait bound `Quiet: Folk` is not satisfied; `Quiet` doesn't store `Npc`
+p7:98  E0277 `Chest<Up<Zero>>` doesn't fit in `Chest<Up<Zero>>`: the relation is ranked, and ranks must rise
+p7:104 E0277 `Holder` isn't a kind
+p7:111 E0277 the trait bound `Room: Member<Walker>` is not satisfied
+p7:112 E0277 `Walker` doesn't carry a `At` edge
+```

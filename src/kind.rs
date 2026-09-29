@@ -13,6 +13,11 @@ use crate::schema::{Part, Schema, Shared};
 ///
 /// A kind's data is fixed at spawn and read with `t[id]`; it needs no `Default`. What changes
 /// lives in components and edges.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` isn't a kind",
+    label = "not a kind",
+    note = "if `{Self}` is a set, it has no data of its own: `cast` a handle into it to one of its kinds first"
+)]
 pub trait Kind: Part<Side = Shared, Store = KindList<Self>> + fmt::Debug + Sized + 'static {
     /// Where the kind stands in `ranked` relations: an edge of a ranked relation goes from a
     /// lower rank to a strictly higher one. `Top` unless `kind!` says `rank`.
@@ -165,6 +170,11 @@ links!(A 0, B 1, C 2, D 3);
 
 /// `K` carries a `one` edge of `R`: `kind!(K needs R)`.
 #[doc(hidden)]
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` doesn't carry a `{R}` edge",
+    label = "no `{R}` edge here",
+    note = "a `one` edge is carried by the kinds that `need` it: relate from, or read `target` of, one of those kinds; `cast` a set handle to it first"
+)]
 pub trait Carries<R: Relation>: Kind {
     fn slot(links: &Self::Links) -> &Rc<OneSlot<R>>;
 }

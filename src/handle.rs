@@ -72,6 +72,11 @@ pub trait Set: Handle {}
 
 /// `Self` is `S`, or a kind in the set `S`. Every kind and set is a member of itself;
 /// `is!` adds kinds to sets.
+#[diagnostic::on_unimplemented(
+    message = "`{Self}` isn't a `{S}`",
+    label = "expected a `{S}`",
+    note = "an edge's ends must be of the relation's source and target kinds or sets; `is!` puts a kind in a set"
+)]
 pub trait Member<S: Handle>: Handle {
     #[doc(hidden)]
     fn up<'t>(r: Self::Ref<'t>) -> S::Ref<'t>;
