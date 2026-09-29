@@ -22,7 +22,7 @@
 //!   kind doesn't `need`, overlapping endpoints without a loop rule, `cascade` or `spill` from
 //!   the root, and `one` edges that could let an entity own itself.
 //!
-//! No `unsafe`, no dependencies, and no panics: runtime refusals are `Refused`, and `Sure`
+//! Safe Rust only, no dependencies, and no panics: runtime refusals are `Refused`, and `Sure`
 //! operations return their value bare. Nightly, for `decl_macro` only: crates that call
 //! `module!` enable `#![feature(decl_macro)]`.
 //!
