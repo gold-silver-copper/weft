@@ -3,5 +3,12 @@
 version = 4
 
 [[package]]
+name = "game"
+version = "0.1.0"
+dependencies = [
+ "weft",
+]
+
+[[package]]
 name = "weft"
 version = "0.1.0"

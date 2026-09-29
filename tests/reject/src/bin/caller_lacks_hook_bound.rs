@@ -1,0 +1,61 @@
+//! C7: every caller of a relation carries the bound its hook declares.
+#![feature(decl_macro)]
+use weft::*;
+
+#[derive(Debug)]
+pub struct Settings;
+kind!(root Settings);
+
+#[derive(Debug)]
+pub struct Room;
+kind!(Room);
+
+#[derive(Debug)]
+pub struct Player;
+kind!(Player needs At);
+
+#[derive(Debug)]
+pub struct Item;
+kind!(Item needs In);
+
+set!(pub Holder);
+is!(Room, Player: Holder);
+
+relation!(pub struct In: Item -> Holder, one, cascade);
+relation!(pub struct At: Player -> Room, one, refuse, on_relate = pick_up: Map);
+
+module!(pub Map { kinds: [Room, Player, Item], relations: [In, At] });
+game!(pub Game: Settings [Map]);
+
+fn pick_up<'t, G: Map>(t: &mut Turn<'t, G>, me: Id<'t, Player>, room: Id<'t, Room>) -> Result<(), Refused> {
+    let loose: Vec<_> = t.sources::<In>(room).map(|(item, _)| item).collect();
+    for item in loose {
+        t.relate(item, In, me)?;
+    }
+    Ok(())
+}
+
+/// Walks the player. Its bounds name `At`, but not everything `At`'s hook reaches.
+#[cfg(not(twin))]
+fn walk<'t, G>(t: &mut Turn<'t, G>, me: Id<'t, Player>, to: Id<'t, Room>) -> Result<(), Refused>
+where
+    G: Has<At> + Has<Player> + Has<Room>,
+{
+    t.relate(me, At, to) // ~ERROR E0277
+}
+#[cfg(twin)]
+fn walk<'t, G: Map>(t: &mut Turn<'t, G>, me: Id<'t, Player>, to: Id<'t, Room>) -> Result<(), Refused> {
+    t.relate(me, At, to)
+}
+
+fn main() {
+    let mut world = World::<Game>::new(|t| {
+        let hall = t.spawn(Room, ());
+        t.spawn(Player, (At, hall));
+        t.spawn(Settings, ())
+    });
+    let _ = world.turn(|t| match (t.all::<Player>().next(), t.all::<Room>().next()) {
+        (Some(me), Some(room)) => walk(t, me, room),
+        _ => Ok(()),
+    });
+}

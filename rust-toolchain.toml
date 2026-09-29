@@ -1,0 +1,5 @@
+[toolchain]
+# rustc 1.100.0-nightly (bba531001 2026-09-20), the compiler option c's spike ran.
+channel = "nightly-2026-09-21"
+components = ["clippy", "rust-analyzer", "rust-src"]
+profile = "minimal"

@@ -4,3 +4,17 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+
+[workspace]
+members = ["game"]
+exclude = ["tests/reject", "tests/accept"]
+
+[[test]]
+name = "claims"
+path = "tests/behaviour/claims.rs"
+
+[lints.rust]
+# `tests/mutants.rs` builds the library with one planted bug at a time.
+unexpected_cfgs = { level = "warn", check-cfg = [
+    'cfg(weft_mutant, values("purge_keeps_edges", "back_reads_forward_label", "cast_by_string"))',
+] }
