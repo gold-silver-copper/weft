@@ -85,6 +85,9 @@ macro_rules! __kind {
 #[macro_export]
 macro_rules! __carries {
     ([$($g:tt)*] [$($ty:tt)*] [$($is:tt)*]) => {};
+    ([$($g:tt)*] [$($ty:tt)*] [] $($n:ident),+) => {
+        ::core::compile_error!("a kind can need at most four relations");
+    };
     ([$($g:tt)*] [$($ty:tt)*] [$i:tt $($is:tt)*] $n:ident $(, $rest:ident)*) => {
         impl<$($g)*> $crate::__private::Carries<$n> for $($ty)* {
             fn slot(links: &<Self as $crate::Kind>::Links) -> &$crate::__private::Rc<$crate::__private::OneSlot<$n>> {

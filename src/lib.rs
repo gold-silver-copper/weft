@@ -1,6 +1,77 @@
 //! A typed entity-relation graph for text games, where invalid states don't compile.
 //!
-//! See `docs/design/0002-improve-ecs.md`.
+//! A game is kinds (`kind!`), open sets of kinds (`set!`, `is!`), relations between them
+//! (`relation!`) and components (`component!`), grouped into modules (`module!`) and put
+//! together by `game!`. A `World` of that game changes only in turns, and every rule it keeps
+//! is a type where Rust allows one:
+//!
+//! - **Handles can't go stale.** `Id<'t, K>` is branded to its turn: it can't leave it or
+//!   enter another world's, so if a handle exists, its entity exists.
+//! - **Reads are total.** `t[id]` and `target` on a `one` relation read fields; there is no
+//!   `Option`, no fallback value, and kinds need no `Default`.
+//! - **Relations keep their shape.** Endpoints are typed; a `one` edge is given at spawn and
+//!   can only be moved; a two-way relation is one fact with a value for each end;
+//!   `ranked` relations can't loop, because every edge must go up in rank.
+//! - **Hooks declare their reach.** `on_relate = f: Bound` runs `f` on every new edge, and
+//!   every caller that relates the relation must meet `Bound`. Chains that never settle are
+//!   refused.
+//! - **Despawns are planned.** A despawn dooms its entity; `cascade`, `detach`, `spill` and
+//!   `refuse` decide what happens to the edges into it when the turn ends, and a despawn a
+//!   `refuse` edge would break is refused.
+//! - **`game!` checks the declarations** under `cargo check`: a `one` relation its source
+//!   kind doesn't `need`, overlapping endpoints without a loop rule, `cascade` or `spill` from
+//!   the root, and `one` edges that could let an entity own itself.
+//!
+//! No `unsafe`, no dependencies, and no panics: runtime refusals are `Refused`, and `Sure`
+//! operations return their value bare. Nightly, for `decl_macro` only: crates that call
+//! `module!` enable `#![feature(decl_macro)]`.
+//!
+//! ```
+//! #![feature(decl_macro)]
+//! use weft::*;
+//!
+//! #[derive(Debug)]
+//! pub struct Settings;
+//! kind!(root Settings);
+//!
+//! #[derive(Debug)]
+//! pub struct Room {
+//!     pub name: &'static str,
+//! }
+//! kind!(Room);
+//!
+//! #[derive(Debug)]
+//! pub struct Item {
+//!     pub name: &'static str,
+//! }
+//! kind!(Item needs In); // an item is always somewhere
+//!
+//! relation!(pub struct In: Item -> Room, one, cascade);
+//! relation!(pub struct Exit(pub &'static str): Room <-> Room, many, cyclic, detach);
+//!
+//! module!(pub Map { kinds: [Room, Item], relations: [In, Exit] });
+//! game!(pub Game: Settings [Map]);
+//!
+//! let mut world = World::<Game>::new(|t| {
+//!     let hall = t.spawn(Room { name: "hall" }, ());
+//!     let cellar = t.spawn(Room { name: "cellar" }, ());
+//!     t.relate(hall, (Exit("down"), Exit("up")), cellar);
+//!     t.spawn(Item { name: "lamp" }, (In, hall));
+//!     t.spawn(Settings, ())
+//! });
+//!
+//! let moved = world.turn(|t| {
+//!     let lamp = t.all::<Item>().next()?;
+//!     let here = t.target::<In>(lamp); // an `Id`, not an `Option`
+//!     let (down, _) = t.targets::<Exit>(here).next()?;
+//!     t.relate(lamp, In, down).ok()?; // `In` is `one`: relating again moves it
+//!     Some(t[t.target::<In>(lamp)].name)
+//! });
+//! assert_eq!(moved, Some("cellar"));
+//! assert_eq!(world.check(), Ok(()));
+//! ```
+//!
+//! The design and its trade-offs: `DESIGN.md`, and the decision records in `docs/design/`.
 
 #![feature(decl_macro)]
 #![forbid(unsafe_code)]
