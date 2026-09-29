@@ -1,25 +1,21 @@
-//! C12: a kind that can be the source of a `one` relation must `need` it.
+//! C12: a kind that can be the source of a `one` relation must need it.
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room;
-kind!(Room);
 
-#[derive(Debug)]
+#[cfg_attr(not(twin), kind)]
+#[cfg_attr(twin, kind(needs = [At]))]
 pub struct Npc;
-#[cfg(not(twin))]
-kind!(Npc);
-#[cfg(twin)]
-kind!(Npc needs At);
 
-relation!(pub struct At: Npc -> Room, one, refuse);
+#[relation(Npc -> Room, one, refuse)]
+pub struct At;
 
 module!(pub Town { kinds: [Room, Npc], relations: [At] });
-game!(pub Game: Settings [Town]); // ~ERROR E0080 "must `need` it"
+game!(pub Game: Settings [Town]); // ~ERROR E0080 "must need it"
 
 fn main() {}

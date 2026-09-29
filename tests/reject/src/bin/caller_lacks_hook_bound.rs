@@ -2,27 +2,25 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room;
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Player;
-kind!(Player needs At);
 
-#[derive(Debug)]
+#[kind(needs = [In])]
 pub struct Item;
-kind!(Item needs In);
 
 set!(pub Holder);
 is!(Room, Player: Holder);
 
-relation!(pub struct In: Item -> Holder, one, cascade);
-relation!(pub struct At: Player -> Room, one, refuse, on_relate = pick_up: Map);
+#[relation(Item -> Holder, one, cascade)]
+pub struct In;
+#[relation(Player -> Room, one, refuse, on_relate = pick_up: Map)]
+pub struct At;
 
 module!(pub Map { kinds: [Room, Player, Item], relations: [In, At] });
 game!(pub Game: Settings [Map]);

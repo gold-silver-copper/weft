@@ -1,38 +1,41 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root, needs = [Start, Plays])]
 pub struct Settings;
-kind!(root Settings needs Start, Plays);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room {
     pub name: &'static str,
     pub desc: &'static str,
 }
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Player;
-kind!(Player needs At);
 
-#[derive(Debug)]
+#[kind(needs = [In])] // an `Item` can't be spawned without its container
 pub struct Item {
     pub name: &'static str,
 }
-kind!(Item needs In); // an `Item` can't be spawned without its container
 
 set!(pub Holder);
 is!(Room, Player: Holder);
 
 // A two-way exit is one fact with a label for each direction.
-relation!(pub struct Exit(pub &'static str): Room <-> Room, many, cyclic, detach);
+#[relation(Room <-> Room, many, cyclic, detach)]
+pub struct Exit(pub &'static str);
 // `Item` is not a `Holder`, so `In` can't loop and needs no loop rule (`game!` checks this).
-relation!(pub struct In: Item -> Holder, one, cascade);
+#[relation(Item -> Holder, one, cascade)]
+pub struct In;
 // Where the player stands. Setting it runs `entered`, which may use anything in `Map`.
-relation!(pub struct At: Player -> Room, one, refuse, on_relate = entered: Map);
-relation!(pub struct Start: Settings -> Room, one, refuse);
-relation!(pub struct Plays: Settings -> Player, one, refuse);
+#[relation(Player -> Room, one, refuse, on_relate = entered: Map)]
+pub struct At;
+
+#[relation(Settings -> Room, one, refuse)]
+pub struct Start;
+
+#[relation(Settings -> Player, one, refuse)]
+pub struct Plays;
 
 module!(pub Map { kinds: [Room, Player, Item], relations: [Exit, In, At, Start, Plays] });
 game!(pub Game: Settings [Map]);

@@ -4,7 +4,7 @@ The run that built weft against `docs/design/0002-improve-ecs.md`, on branch `im
 
 ## Claims
 
-Checked on the final tree, cold (`cargo clean` first): `cargo test --workspace` passed every test binary and doctest in 17 s including the build; both clippy runs passed; rust-analyzer as below.
+Checked on the final tree, cold (`cargo clean` first): `cargo test --workspace` passed every test binary and doctest in 30 s including the build; both clippy runs passed; rust-analyzer as below.
 
 | id | claim | status | gates, as run |
 |---|---|---|---|
@@ -21,8 +21,8 @@ Checked on the final tree, cold (`cargo clean` first): `cargo test --workspace` 
 | C11 | changing the graph while iterating it doesn't compile | green | `conflicting_query` (E0502) |
 | C12 | `game!` and `relation!` reject bad declarations under `cargo check` | green | `one_not_in_needs`, `root_cascade` (E0080 at `game!`), `detach_on_one`, `spill_on_many` (E0080 at `relation!`) |
 | C13 | a module from another crate drops into a downstream `game!` | green | `module_from_another_crate`: membership declared upstream (`Bag`) and downstream (`Room`), no E0119; builds and runs |
-| C14 | everything infers | green | `rust-analyzer analysis-stats .`: `exprs: 31062, ??ty: 0, ?ty: 0`; `pats: 4875, ??ty: 0, ?ty: 0` (after D5) |
-| C15 | no `unsafe`, no dependencies, no library panics, no runtime type lookup | green | `cargo clippy -p weft --lib -- -D warnings` passes under the af02049 forbid wall; `lint_wall_is_intact`, `no_third_party_crates`, `source_is_clean` pass |
+| C14 | everything infers | green | `rust-analyzer analysis-stats .`: `exprs: 45917, ??ty: 0, ?ty: 0`; `pats: 5832, ??ty: 0, ?ty: 0` (after D5 and D7, with the proc macros expanded) |
+| C15 | no `unsafe`, no dependencies beyond the approved compile-time proc-macro crates (D7), no library panics, no runtime type lookup | green | `cargo clippy -p weft --lib -- -D warnings` passes under the af02049 forbid wall; `lint_wall_is_intact`, `no_third_party_crates` (an allow-list, seen to fail), `source_is_clean` (over `src` and `weft-macros/src`) pass |
 | C16 | P1–P7 compile and behave as written | green | `programs::every_program_runs` (every promised line, in order); `cargo test -p game`: 4 tests, including the exact snapshot, and 11 `compile_fail` doctests with their stated codes; every line P3, P6 and P7 comment out fails with E0277 when uncommented, and each has a reject case or doctest (D6) |
 | C17 | dropping a world drops everything it ever spawned | green | `claims::drop_frees_everything`, including despawned entities and a 20,000-move edge history |
 | C18 | the gates can fail | green | every twin compiles; the wrong-code canary fails; the fuzzer catches its planted fault (`seed 1, turn 17: is_doomed(14)`); all three mutants killed as test failures |
@@ -38,6 +38,7 @@ The fuzzer's run: 60 worlds x 30 turns, the world matched the model after every 
 - **D4**: semantics the record left open: `spill` with nowhere to land despawns, hook chains have a depth limit and budget (`Refused::Unsettled`), spawn fallibility follows `refuse` and hooks, `<->` is `many` only, and `one` edges may not form an ownership loop over kinds (at most 128 kinds per game).
 - **D5**: ranks are Peano types, not const generics, because rust-analyzer can't type a const-generic literal; this drops `generic_const_exprs` and changes how P3, P5, P6 and P7 spell ranks (`Chest<R>` with a `rank: R` field, `Chest<R1>`).
 - **D6**: two more reject cases, for the invalid states P6 and P7 comment out that no case covered (a module-bounded call for a game without the module; `target` through a set handle), plus clearer messages for `Kind`, `Member` and `Carries`.
+- **D7**: at the owner's request, declarations are attributes (`#[kind(needs = [In], rank = 0)]`, `#[relation(..)]`, `#[component(..)]`) and proc macros (`module!`, `game!`) in a new crate, `weft-macros`, built on `syn`, `quote`, `proc-macro2` and `darling`, which the owner approved; C15's "no dependencies" becomes an allow-list of those; the weft library needs no nightly feature any more.
 
 ## Reopen triggers
 
@@ -45,15 +46,15 @@ None was hit. The nearest was **Inference fails**: before D5, C14 stood at `??ty
 
 ## Toolchain
 
-`rust-toolchain.toml` pins `nightly-2026-09-21`: rustc 1.100.0-nightly (bba531001 2026-09-20), with `clippy`, `rust-analyzer` and `rust-src`. After D5, weft enables `decl_macro` only, so the next-generation trait solver runs as the toolchain intends; nothing falls back.
+`rust-toolchain.toml` pins `nightly-2026-09-21`: rustc 1.100.0-nightly (bba531001 2026-09-20), with `clippy`, `rust-analyzer` and `rust-src`. After D5 and D7, the weft library enables no nightly feature; crates that call `module!` enable `decl_macro`.
 
 ## rust-analyzer
 
 The pinned build (`rust-analyzer 1.100.0-nightly (bba531001 2026-09-20)`), `analysis-stats .` on the final tree:
 
 ```text
-exprs: 31062, ??ty: 0 (0%), ?ty: 0 (0%), !ty: 0
-pats: 4875, ??ty: 0 (0%), ?ty: 0 (0%), !ty: 0
+exprs: 45917, ??ty: 0 (0%), ?ty: 0 (0%), !ty: 0
+pats: 5832, ??ty: 0 (0%), ?ty: 0 (0%), !ty: 0
 Mir failed bodies: 0 (0%)
 Failed data layouts: 0 (0%)
 ```

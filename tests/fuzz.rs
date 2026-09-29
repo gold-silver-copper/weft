@@ -20,42 +20,36 @@ use weft::*;
 
 // ============================================================ the game under test
 
-#[derive(Debug)]
+#[kind(root, needs = [Start])]
 pub struct Settings {
     pub seed: u64,
 }
-kind!(root Settings needs Start);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room {
     pub id: u32,
 }
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Npc {
     pub id: u32,
 }
-kind!(Npc needs At);
 
-#[derive(Debug)]
+#[kind(needs = [In], rank = 0)]
 pub struct Item {
     pub id: u32,
 }
-kind!(Item rank 0 needs In);
 
-#[derive(Debug)]
+#[kind(needs = [In], rank = R)]
 pub struct Chest<R> {
     pub id: u32,
     pub rank: R,
 }
-kind!(Chest<R> rank R needs In);
 
-#[derive(Debug)]
+#[kind(needs = [Stash], rank = 0)]
 pub struct Coin {
     pub id: u32,
 }
-kind!(Coin rank 0 needs Stash);
 
 set!(pub Thing);
 set!(pub Holder);
@@ -64,16 +58,32 @@ is!(Chest<R>: Thing, Holder);
 is!(Room, Npc: Holder);
 
 // Things nest by rank and spill up when their holder goes; coins go with theirs.
-relation!(pub struct In: Thing -> Holder, one, ranked, spill);
-relation!(pub struct Stash: Coin -> Holder, one, ranked, cascade);
-relation!(pub struct Start: Settings -> Room, one, refuse);
+#[relation(Thing -> Holder, one, ranked, spill)]
+pub struct In;
+
+#[relation(Coin -> Holder, one, ranked, cascade)]
+pub struct Stash;
+
+#[relation(Settings -> Room, one, refuse)]
+pub struct Start;
 // Arriving in a room guards it, then picks up its loose items.
-relation!(pub struct At: Npc -> Room, one, refuse, on_relate = arrive: Fz);
-relation!(pub struct Exit(pub u8): Room <-> Room, many, cyclic, detach);
-relation!(pub struct Likes(pub u8): Npc -> Npc, many, cyclic, detach);
-relation!(pub struct Guards: Npc -> Room, opt, detach);
-relation!(pub struct Owns: Npc -> Item, many, refuse);
-component!(pub struct Weight(pub u32): Item);
+#[relation(Npc -> Room, one, refuse, on_relate = arrive: Fz)]
+pub struct At;
+
+#[relation(Room <-> Room, many, cyclic, detach)]
+pub struct Exit(pub u8);
+
+#[relation(Npc -> Npc, many, cyclic, detach)]
+pub struct Likes(pub u8);
+
+#[relation(Npc -> Room, opt, detach)]
+pub struct Guards;
+
+#[relation(Npc -> Item, many, refuse)]
+pub struct Owns;
+
+#[component(Item)]
+pub struct Weight(pub u32);
 
 module!(pub Fz {
     kinds: [Room, Npc, Item, Chest<R1>, Chest<R2>, Coin],
@@ -837,24 +847,23 @@ fn planted_fault_is_caught() {
 pub mod tennis {
     use weft::*;
 
-    #[derive(Debug)]
+    #[kind(root)]
     pub struct Umpire;
-    kind!(root Umpire);
 
-    #[derive(Debug)]
+    #[kind]
     pub struct Court {
         pub side: u8,
     }
-    kind!(Court);
 
-    #[derive(Debug)]
+    #[kind(needs = [On])]
     pub struct Ball;
-    kind!(Ball needs On);
 
     // Every landing sends the ball over the net: a chain that never settles.
-    relation!(pub struct On: Ball -> Court, one, cascade, on_relate = volley: Tennis);
+    #[relation(Ball -> Court, one, cascade, on_relate = volley: Tennis)]
+    pub struct On;
     // Every echo answers twice: a chain that never settles and doubles at every step.
-    relation!(pub struct Echo: Court -> Court, many, cyclic, detach, on_relate = echo: Tennis);
+    #[relation(Court -> Court, many, cyclic, detach, on_relate = echo: Tennis)]
+    pub struct Echo;
 
     module!(pub Tennis { kinds: [Court, Ball], relations: [On, Echo] });
     game!(pub Match: Umpire [Tennis]);

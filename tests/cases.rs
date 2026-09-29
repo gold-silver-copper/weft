@@ -78,7 +78,7 @@ fn case(path: &Path) -> Case {
         None => (*rest, None),
     };
     let code = (!code.is_empty()).then(|| code.to_owned());
-    let has_twin = source.lines().any(|l| l.trim() == "#[cfg(twin)]");
+    let has_twin = source.lines().any(|l| l.trim() == "#[cfg(twin)]" || l.trim_start().starts_with("#[cfg_attr(twin,"));
     Case { name, line: *line, code, fragment, has_twin }
 }
 
@@ -191,7 +191,7 @@ fn every_reject_case_fails_at_its_marker() {
 #[test]
 fn every_twin_compiles() {
     let missing: Vec<String> = cases().into_iter().filter(|c| !c.has_twin).map(|c| c.name).collect();
-    assert!(missing.is_empty(), "cases without a `#[cfg(twin)]` twin: {missing:?}");
+    assert!(missing.is_empty(), "cases without a `#[cfg(twin)]` or `#[cfg_attr(twin, ..)]` twin: {missing:?}");
     let (ok, errors, output) = check("reject", "reject-twin", true);
     assert!(ok && errors.is_empty(), "twins must compile:\n{output}");
 }

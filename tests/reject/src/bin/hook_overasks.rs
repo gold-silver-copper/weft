@@ -2,31 +2,28 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room;
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Player;
-kind!(Player needs At);
 
-#[derive(Debug)]
+#[kind(needs = [In])]
 pub struct Item;
-kind!(Item needs In);
 
 set!(pub Holder);
 is!(Room, Player: Holder);
 
-relation!(pub struct In: Item -> Holder, one, cascade);
+#[relation(Item -> Holder, one, cascade)]
+pub struct In;
+
 // `pick_up` moves items through `In`, but `Walk` only names `At`.
-#[cfg(not(twin))]
-relation!(pub struct At: Player -> Room, one, refuse, on_relate = pick_up: Walk); // ~ERROR E0277
-#[cfg(twin)]
-relation!(pub struct At: Player -> Room, one, refuse, on_relate = pick_up: Map);
+#[cfg_attr(not(twin), relation(Player -> Room, one, refuse, on_relate = pick_up: Walk))] // ~ERROR E0277
+#[cfg_attr(twin, relation(Player -> Room, one, refuse, on_relate = pick_up: Map))]
+pub struct At;
 
 module!(pub Walk { kinds: [Room, Player], relations: [At] });
 module!(pub Map { kinds: [Room, Player, Item], relations: [In, At] });

@@ -2,39 +2,33 @@
 use std::error::Error;
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root, needs = [Start, Plays])]
 pub struct Settings;
-kind!(root Settings needs Start, Plays);
 
 // No kind derives `Default`: nothing is ever read from a made-up row.
-#[derive(Debug)]
+#[kind]
 pub struct Room {
     pub name: &'static str,
 }
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Player;
-kind!(Player needs At);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Npc {
     pub name: &'static str,
 }
-kind!(Npc needs At);
 
-#[derive(Debug)]
+#[kind(needs = [In], rank = 0)]
 pub struct Item {
     pub name: &'static str,
 }
-kind!(Item rank 0 needs In);
 
-#[derive(Debug)]
+#[kind(needs = [In], rank = R)]
 pub struct Chest<R> {
     pub name: &'static str,
     pub rank: R,
 }
-kind!(Chest<R> rank R needs In);
 
 set!(pub Walker);
 is!(Player, Npc: Walker);
@@ -44,12 +38,18 @@ set!(pub Holder);
 is!(Room, Player: Holder);
 is!(Chest<R>: Thing, Holder);
 
-relation!(pub struct In: Thing -> Holder, one, ranked, spill);
+#[relation(Thing -> Holder, one, ranked, spill)]
+pub struct In;
 // The hook's bound is a whole module, not just `At`: it may move items through `In`.
 // Every caller that relates `At` carries `Map` in its own bounds, so the effect is visible.
-relation!(pub struct At: Walker -> Room, one, refuse, on_relate = pick_up: Map);
-relation!(pub struct Start: Settings -> Room, one, refuse);
-relation!(pub struct Plays: Settings -> Player, one, refuse);
+#[relation(Walker -> Room, one, refuse, on_relate = pick_up: Map)]
+pub struct At;
+
+#[relation(Settings -> Room, one, refuse)]
+pub struct Start;
+
+#[relation(Settings -> Player, one, refuse)]
+pub struct Plays;
 
 module!(pub Map {
     kinds: [Room, Player, Npc, Item, Chest<R1>],

@@ -3,8 +3,8 @@
 //!
 //! Every answer is an inherent associated const of `Probe` that only exists when its bounds
 //! hold; when they don't, the path falls back to `Otherwise`'s `false`. The choice is made
-//! per concrete type, so it sees every `is!` and `kind!` in the whole crate graph, which is
-//! why the questions live in `game!` rather than in `relation!`. Option a's spike showed the
+//! per concrete type, so it sees every `is!` and `#[kind]` in the whole crate graph, which is
+//! why the questions live in `game!` rather than in `#[relation]`. Option a's spike showed the
 //! technique on stable Rust; the crates that expand `game!` need no feature for it.
 
 use std::marker::PhantomData;
@@ -43,7 +43,7 @@ where
     pub const ONE_SOURCE: bool = true;
 }
 
-/// `kind!(K needs R)`.
+/// `#[kind(needs = [R])]`.
 impl<K: Carries<R>, R: Relation> Probe<K, R> {
     #[allow(dead_code)]
     pub const NEEDED: bool = true;

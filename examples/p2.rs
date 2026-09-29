@@ -1,20 +1,20 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Npc {
     pub name: &'static str,
 }
-kind!(Npc);
 
 // How well two NPCs know each other, from each side. One fact, two values.
-relation!(pub struct Knows(pub u8): Npc <-> Npc, many, cyclic, detach);
+#[relation(Npc <-> Npc, many, cyclic, detach)]
+pub struct Knows(pub u8);
 // How much the source likes the target. Not mutual.
-relation!(pub struct Likes(pub u8): Npc -> Npc, many, cyclic, detach);
+#[relation(Npc -> Npc, many, cyclic, detach)]
+pub struct Likes(pub u8);
 
 module!(pub Village { kinds: [Npc], relations: [Knows, Likes] });
 game!(pub Game: Settings [Village]);

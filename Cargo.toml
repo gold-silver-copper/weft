@@ -4,9 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+weft-macros = { path = "weft-macros", version = "0.1.0" }
 
 [workspace]
-members = ["game"]
+members = ["game", "weft-macros"]
 exclude = ["tests/reject", "tests/accept"]
 
 [[test]]

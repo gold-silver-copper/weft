@@ -2,26 +2,26 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room {
     pub name: &'static str,
 }
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Npc {
     pub name: &'static str,
 }
-kind!(Npc needs At);
 
 // Arriving somewhere makes an NPC follow whoever is already there (`At` relates `Follows`);
 // following someone takes the follower to the leader's room (`Follows` relates `At`).
-relation!(pub struct At: Npc -> Room, one, refuse, on_relate = arrive: Town);
-relation!(pub struct Follows: Npc -> Npc, opt, cyclic, detach, on_relate = catch_up: Town);
+#[relation(Npc -> Room, one, refuse, on_relate = arrive: Town)]
+pub struct At;
+
+#[relation(Npc -> Npc, opt, cyclic, detach, on_relate = catch_up: Town)]
+pub struct Follows;
 
 module!(pub Town { kinds: [Room, Npc], relations: [At, Follows] });
 game!(pub Game: Settings [Town]);

@@ -3,7 +3,7 @@
 //! it as you type, and `cargo check` rejects it.
 //!
 //! A rank is `Zero`, `Up<R>` (one above `R`), or `Top` (above every other rank, and what a
-//! kind gets when `kind!` doesn't say `rank`). `R0` to `R15` name the first sixteen, as types
+//! kind gets when `#[kind]` doesn't say `rank`). `R0` to `R15` name the first sixteen, as types
 //! and as values.
 
 use std::fmt;
@@ -24,7 +24,7 @@ pub struct Zero;
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub struct Up<R>(pub R);
 
-/// Above every other rank: the rank of kinds `kind!` gives no `rank`.
+/// Above every other rank: the rank of kinds `#[kind]` gives no `rank`.
 #[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub struct Top;
 

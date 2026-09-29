@@ -5,23 +5,24 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(needs = [In])]
 pub struct Item {
     pub name: &'static str,
 }
-kind!(Item needs In);
 
-#[derive(Debug)]
+#[kind]
 pub struct Bag {
     pub name: &'static str,
 }
-kind!(Bag);
 
 set!(pub Holder);
 is!(Bag: Holder); // set membership declared upstream
 
-relation!(pub struct In: Item -> Holder, one, cascade);
-component!(pub struct Weight(pub u32): Item);
+#[relation(Item -> Holder, one, cascade)]
+pub struct In;
+
+#[component(Item)]
+pub struct Weight(pub u32);
 
 module!(pub Containers { kinds: [Item, Bag], relations: [In], components: [Weight] });
 

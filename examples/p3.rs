@@ -2,34 +2,29 @@
 use std::error::Error;
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root, needs = [Start, Plays])]
 pub struct Settings;
-kind!(root Settings needs Start, Plays);
 
-#[derive(Debug)]
+#[kind] // rank `Top` (the default): anything ranked lower fits in it
 pub struct Room {
     pub name: &'static str,
 }
-kind!(Room); // rank `Top` (the default): anything ranked lower fits in it
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Player;
-kind!(Player needs At);
 
-#[derive(Debug)]
+#[kind(needs = [In], rank = 0)] // holds nothing
 pub struct Item {
     pub name: &'static str,
 }
-kind!(Item rank 0 needs In); // holds nothing
 
 /// A container that can itself be put away. Its rank is in its type:
 /// a `Chest<R2>` holds `Chest<R1>`s and `Item`s, never another `Chest<R2>`.
-#[derive(Debug)]
+#[kind(needs = [In], rank = R)]
 pub struct Chest<R> {
     pub name: &'static str,
     pub rank: R,
 }
-kind!(Chest<R> rank R needs In);
 
 set!(pub Thing); // what can be put somewhere
 set!(pub Holder); // what things can be put in
@@ -40,11 +35,20 @@ is!(Room, Player: Holder);
 // `Chest` is both a `Thing` and a `Holder`, so `In` could loop. `ranked` makes every edge
 // go from a lower rank to a higher one, so no loop can be written: `cargo check` refuses it.
 // Without `ranked` (or `cyclic`), `game!` below doesn't compile.
-relation!(pub struct In: Thing -> Holder, one, ranked, cascade);
-relation!(pub struct Exit(pub &'static str): Room <-> Room, many, cyclic, detach);
-relation!(pub struct At: Player -> Room, one, refuse);
-relation!(pub struct Start: Settings -> Room, one, refuse);
-relation!(pub struct Plays: Settings -> Player, one, refuse);
+#[relation(Thing -> Holder, one, ranked, cascade)]
+pub struct In;
+
+#[relation(Room <-> Room, many, cyclic, detach)]
+pub struct Exit(pub &'static str);
+
+#[relation(Player -> Room, one, refuse)]
+pub struct At;
+
+#[relation(Settings -> Room, one, refuse)]
+pub struct Start;
+
+#[relation(Settings -> Player, one, refuse)]
+pub struct Plays;
 
 module!(pub Keep {
     kinds: [Room, Player, Item, Chest<R1>, Chest<R2>],

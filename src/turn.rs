@@ -275,7 +275,7 @@ impl<T> SwapRemove<T> for Vec<T> {
 // ------------------------------------------------------------------ needs
 
 /// The `one` edges a spawn is given: `()`, `(R, target)`, or a tuple of those, in the order
-/// `kind!(.. needs ..)` lists them.
+/// `#[kind(needs = [..])]` lists them.
 pub trait Needs<'t, K: Kind, G: Schema>: Sized {
     /// Whether the spawn can be refused.
     #[doc(hidden)]
@@ -418,6 +418,10 @@ macro_rules! needs {
 needs!(A YA 0, B YB 1);
 needs!(A YA 0, B YB 1, C YC 2);
 needs!(A YA 0, B YB 1, C YC 2, D YD 3);
+needs!(A YA 0, B YB 1, C YC 2, D YD 3, E YE 4);
+needs!(A YA 0, B YB 1, C YC 2, D YD 3, E YE 4, F YF 5);
+needs!(A YA 0, B YB 1, C YC 2, D YD 3, E YE 4, F YF 5, H YH 6);
+needs!(A YA 0, B YB 1, C YC 2, D YD 3, E YE 4, F YF 5, H YH 6, I YI 7);
 
 // ------------------------------------------------------------------ genesis
 

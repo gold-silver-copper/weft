@@ -1,4 +1,4 @@
-//! Relations: `relation!`, and how their edges are stored.
+//! Relations: `#[relation]`, and how their edges are stored.
 
 use std::cell::Cell;
 use std::collections::BTreeSet;
@@ -15,7 +15,7 @@ use crate::turn::{Live, Turn};
 
 // ------------------------------------------------------------------ arity
 
-/// Exactly one target per source. The edge is required at spawn (`kind!(K needs R)`),
+/// Exactly one target per source. The edge is required at spawn (`#[kind(needs = [R])]`),
 /// relating again moves it, and it can't be unrelated.
 pub enum One {}
 /// At most one target per source. Relating again replaces the edge.
@@ -159,7 +159,7 @@ impl PolicyKind for Refuse {
 
 // ------------------------------------------------------------------ relations
 
-/// A relation, declared with `relation!`: typed endpoints, an arity, a loop rule, a despawn
+/// A relation, declared with `#[relation]`: typed endpoints, an arity, a loop rule, a despawn
 /// policy, and optionally a hook.
 pub trait Relation: Part<Side = Shared, Store = RelLog<Self>> + fmt::Debug + Sized + 'static {
     /// The kind or set edges come from.
@@ -205,22 +205,6 @@ pub trait Value {
     fn vals(self) -> <Self::Relation as Relation>::Vals;
 }
 
-/// The rules `relation!` checks as soon as a relation is declared: what's wrong with its
-/// declaration, if anything. `relation!` turns the answer into a `cargo check` error.
-#[doc(hidden)]
-pub const fn check_relation<R: Relation>() -> Option<&'static str> {
-    let one = <R::Arity as Arity>::ONE;
-    let many = !<R::Arity as Arity>::SINGLE;
-    match <R::Policy as PolicyKind>::POLICY {
-        Policy::Detach if one => {
-            Some("`detach` would leave a `one` edge's source with no edge: use `cascade`, `spill` or `refuse`")
-        }
-        Policy::Spill if !one => Some("`spill` moves the source's `one` edge up a level, so it needs a `one` relation"),
-        _ if R::TWO_WAY && !many => Some("a two-way (`<->`) relation must be `many`"),
-        _ => None,
-    }
-}
-
 /// A two-way (`<->`) relation: one fact, with a value for each direction.
 pub trait TwoWay: Relation<Vals = (Self, Self)> {}
 
@@ -251,7 +235,7 @@ pub trait Holds<'t, R: Relation<Arity: Single>> {
 }
 
 /// The hook a relation runs when a live turn makes one of its edges, and the bound a
-/// caller must meet to make one. `relation!` implements it; with `on_relate = f: Bound`,
+/// caller must meet to make one. `#[relation]` implements it; with `on_relate = f: Bound`,
 /// only for games that meet `Bound`.
 pub trait OnRelate<G: Schema>: Relation {
     #[doc(hidden)]

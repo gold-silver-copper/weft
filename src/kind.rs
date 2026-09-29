@@ -1,4 +1,4 @@
-//! Kinds: `kind!`, the nodes they are stored in, and the `one` edges each node carries.
+//! Kinds: `#[kind]`, the nodes they are stored in, and the `one` edges each node carries.
 
 use std::cell::Cell;
 use std::fmt;
@@ -9,7 +9,7 @@ use crate::handle::{Handle, Id};
 use crate::relation::Relation;
 use crate::schema::{Part, Schema, Shared};
 
-/// An entity kind, declared with `kind!`.
+/// An entity kind, declared with `#[kind]`.
 ///
 /// A kind's data is fixed at spawn and read with `t[id]`; it needs no `Default`. What changes
 /// lives in components and edges.
@@ -20,7 +20,7 @@ use crate::schema::{Part, Schema, Shared};
 )]
 pub trait Kind: Part<Side = Shared, Store = KindList<Self>> + fmt::Debug + Sized + 'static {
     /// Where the kind stands in `ranked` relations: an edge of a ranked relation goes from a
-    /// lower rank to a strictly higher one. `Top` unless `kind!` says `rank`.
+    /// lower rank to a strictly higher one. `Top` unless `#[kind]` says `rank`.
     type Rank: crate::rank::Rank;
     #[doc(hidden)]
     type Role: Role<Self>;
@@ -138,7 +138,7 @@ impl<K: Kind> KindList<K> {
     }
 }
 
-/// The `one` edges a kind carries, one slot per relation in `kind!(K needs ..)`.
+/// The `one` edges a kind carries, one slot per relation in `#[kind(needs = [..])]`.
 #[doc(hidden)]
 pub trait Links: 'static {
     /// The current target of every slot.
@@ -167,8 +167,12 @@ links!(A 0);
 links!(A 0, B 1);
 links!(A 0, B 1, C 2);
 links!(A 0, B 1, C 2, D 3);
+links!(A 0, B 1, C 2, D 3, E 4);
+links!(A 0, B 1, C 2, D 3, E 4, F 5);
+links!(A 0, B 1, C 2, D 3, E 4, F 5, H 6);
+links!(A 0, B 1, C 2, D 3, E 4, F 5, H 6, I 7);
 
-/// `K` carries a `one` edge of `R`: `kind!(K needs R)`.
+/// `K` carries a `one` edge of `R`: `#[kind(needs = [R])]`.
 #[doc(hidden)]
 #[diagnostic::on_unimplemented(
     message = "`{Self}` doesn't carry a `{R}` edge",

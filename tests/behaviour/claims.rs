@@ -14,13 +14,11 @@ fn root() -> PathBuf {
 
 // ------------------------------------------------------------------ C9: cast
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room;
-kind!(Room);
 
 set!(pub Spirit);
 
@@ -29,11 +27,10 @@ pub mod a {
     use super::Spirit;
     use weft::*;
 
-    #[derive(Debug)]
+    #[kind]
     pub struct Ghost {
         pub n: u32,
     }
-    kind!(Ghost);
     is!(Ghost: Spirit);
 }
 
@@ -41,15 +38,15 @@ pub mod b {
     use super::Spirit;
     use weft::*;
 
-    #[derive(Debug)]
+    #[kind]
     pub struct Ghost {
         pub n: u32,
     }
-    kind!(Ghost);
     is!(Ghost: Spirit);
 }
 
-relation!(pub struct Haunts: Spirit -> Room, many, detach);
+#[relation(Spirit -> Room, many, detach)]
+pub struct Haunts;
 
 module!(pub Haunting { kinds: [Room, a::Ghost, b::Ghost], relations: [Haunts] });
 game!(pub Manor: Settings [Haunting]);
@@ -138,32 +135,57 @@ fn lint_wall_is_intact() {
     }
 }
 
+/// The crates of this repository.
+const OURS: [&str; 5] = ["weft", "weft-macros", "game", "reject", "accept"];
+
+/// The third-party crates the owner approved (deviation D7): the proc-macro toolchain
+/// `weft-macros` is built on, and what it pulls in. Nothing else, and none at runtime.
+const APPROVED: [&str; 9] =
+    ["syn", "quote", "proc-macro2", "unicode-ident", "darling", "darling_core", "darling_macro", "ident_case", "strsim"];
+
+/// The `[dependencies]` table of a manifest, as its lines.
+fn dependencies(manifest: &str) -> Vec<String> {
+    let table = manifest.split("\n[dependencies]\n").nth(1).unwrap_or_default();
+    let table = table.split("\n[").next().unwrap_or_default();
+    table.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).map(str::to_owned).collect()
+}
+
 #[test]
 fn no_third_party_crates() {
-    let ours = ["weft", "game", "reject", "accept"];
     for lock in ["Cargo.lock", "tests/reject/Cargo.lock", "tests/accept/Cargo.lock"] {
         let path = root().join(lock);
         if !path.exists() {
             continue;
         }
-        let text = read(&path);
-        for line in text.lines() {
-            if let Some(name) = line.strip_prefix("name = \"").and_then(|n| n.strip_suffix('"')) {
-                assert!(ours.contains(&name), "{lock} lists a third-party package: {name}");
+        for package in read(&path).split("[[package]]").skip(1) {
+            let field = |key: &str| {
+                package.lines().find_map(|l| l.strip_prefix(key).and_then(|v| v.strip_prefix(" = \"")).map(|v| v.trim_end_matches('"')))
+            };
+            let name = field("name").unwrap_or_default();
+            match field("source") {
+                None => assert!(OURS.contains(&name), "{lock}: `{name}` is neither ours nor from a registry"),
+                Some(source) => {
+                    assert!(APPROVED.contains(&name), "{lock} lists a third-party crate that wasn't approved: {name}");
+                    assert!(source.starts_with("registry+"), "{lock}: `{name}` comes from {source}, not crates.io");
+                }
             }
-            assert!(!line.starts_with("source = "), "{lock} pulls a package from a registry or git: {line}");
         }
     }
-    let manifest = read(&root().join("Cargo.toml"));
-    let deps = manifest.split("[dependencies]").nth(1).unwrap_or_default();
-    let deps = deps.split("\n[").next().unwrap_or_default();
-    assert!(deps.trim().is_empty(), "weft's [dependencies] must stay empty, found: {deps}");
+    let weft = dependencies(&read(&root().join("Cargo.toml")));
+    assert!(
+        weft.len() == 1 && weft.iter().all(|d| d.starts_with("weft-macros = { path = ")),
+        "weft depends on nothing but `weft-macros`, found: {weft:?}"
+    );
+    for dep in dependencies(&read(&root().join("weft-macros/Cargo.toml"))) {
+        let name = dep.split([' ', '=']).next().unwrap_or_default();
+        assert!(APPROVED.contains(&name), "weft-macros depends on a crate that wasn't approved: {dep}");
+    }
 }
 
 #[test]
 fn source_is_clean() {
     let mut files: Vec<PathBuf> = Vec::new();
-    let mut dirs = vec![root().join("src")];
+    let mut dirs = vec![root().join("src"), root().join("weft-macros/src")];
     while let Some(dir) = dirs.pop() {
         for entry in fs::read_dir(&dir).unwrap_or_else(|e| panic!("{}: {e}", dir.display())).filter_map(Result::ok) {
             let path = entry.path();
@@ -211,33 +233,40 @@ pub mod estate {
     use super::Tally;
     use weft::*;
 
-    #[derive(Debug)]
+    #[kind(root, needs = [Seat])]
     pub struct Deeds(pub Tally);
-    kind!(root Deeds needs Seat);
 
-    #[derive(Debug)]
+    #[kind]
     pub struct Hall(pub Tally, pub u32);
-    kind!(Hall);
 
-    #[derive(Debug)]
+    #[kind(needs = [Inside], rank = R)]
     pub struct Box_<R>(pub Tally, pub u32, pub R);
-    kind!(Box_<R> rank R needs Inside);
 
-    #[derive(Debug)]
+    #[kind(needs = [Lives])]
     pub struct Heir(pub Tally, pub u32);
-    kind!(Heir needs Lives);
 
     set!(pub Holder);
     set!(pub Stuff);
     is!(Hall, Heir: Holder);
     is!(Box_<R>: Holder, Stuff);
 
-    relation!(pub struct Seat: Deeds -> Hall, one, refuse);
-    relation!(pub struct Inside: Stuff -> Holder, one, ranked, cascade);
-    relation!(pub struct Lives: Heir -> Hall, one, refuse);
-    relation!(pub struct Road(pub u32): Hall <-> Hall, many, cyclic, detach);
-    relation!(pub struct Envies: Heir -> Heir, many, cyclic, detach);
-    component!(pub struct Worth(pub Tally): Heir);
+    #[relation(Deeds -> Hall, one, refuse)]
+    pub struct Seat;
+
+    #[relation(Stuff -> Holder, one, ranked, cascade)]
+    pub struct Inside;
+
+    #[relation(Heir -> Hall, one, refuse)]
+    pub struct Lives;
+
+    #[relation(Hall <-> Hall, many, cyclic, detach)]
+    pub struct Road(pub u32);
+
+    #[relation(Heir -> Heir, many, cyclic, detach)]
+    pub struct Envies;
+
+    #[component(Heir)]
+    pub struct Worth(pub Tally);
 
     module!(pub Estate {
         kinds: [Hall, Box_<R0>, Box_<R1>, Heir],
@@ -279,7 +308,7 @@ fn drop_frees_everything() {
                 // Shuffle the small boxes between heirs and halls: every move grows a history.
                 for (i, &small) in boxes.iter().enumerate() {
                     let n = (i as u32 + round) as usize;
-                    let moved = if n % 2 == 0 {
+                    let moved = if n.is_multiple_of(2) {
                         t.relate(small, Inside, heirs[n % heirs.len()])
                     } else {
                         t.relate(small, Inside, halls[n % halls.len()])

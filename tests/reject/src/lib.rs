@@ -5,8 +5,8 @@
 //! fragment of the message: `// ~ERROR E0277 "ranks must rise"`. Every error of a case
 //! must be on that line, so a case can't pass by failing somewhere else.
 //!
-//! Each case also has a twin: its `#[cfg(twin)]` lines replace its `#[cfg(not(twin))]` lines
-//! with the nearest legal program. `cargo check` with `--cfg twin` must pass, so a case
+//! Each case also has a twin: its `#[cfg(twin)]` lines (or `#[cfg_attr(twin, ..)]` attributes)
+//! replace its `#[cfg(not(twin))]` ones with the nearest legal program. `cargo check` with `--cfg twin` must pass, so a case
 //! can't pass because the API it uses doesn't exist.
 //!
 //! The doctest below is the wrong-code canary. Putting a chest inside itself is E0277, not

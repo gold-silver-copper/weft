@@ -2,38 +2,32 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room {
     pub name: &'static str,
 }
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Player;
-kind!(Player needs At);
 
-#[derive(Debug)]
+#[kind(needs = [In], rank = 0)]
 pub struct Item {
     pub name: &'static str,
 }
-kind!(Item rank 0 needs In);
 
-#[derive(Debug)]
+#[kind(needs = [In], rank = R)]
 pub struct Chest<R> {
     pub name: &'static str,
     pub rank: R,
 }
-kind!(Chest<R> rank R needs In);
 
-#[derive(Debug)]
+#[kind]
 pub struct Npc {
     pub name: &'static str,
 }
-kind!(Npc);
 
 set!(pub Thing);
 is!(Item: Thing);
@@ -41,10 +35,17 @@ set!(pub Holder);
 is!(Room, Player: Holder);
 is!(Chest<R>: Thing, Holder);
 
-relation!(pub struct In: Thing -> Holder, one, ranked, cascade);
-relation!(pub struct At: Player -> Room, one, refuse);
-relation!(pub struct Exit(pub &'static str): Room <-> Room, many, cyclic, detach);
-relation!(pub struct Likes(pub u8): Npc -> Npc, many, cyclic, detach);
+#[relation(Thing -> Holder, one, ranked, cascade)]
+pub struct In;
+
+#[relation(Player -> Room, one, refuse)]
+pub struct At;
+
+#[relation(Room <-> Room, many, cyclic, detach)]
+pub struct Exit(pub &'static str);
+
+#[relation(Npc -> Npc, many, cyclic, detach)]
+pub struct Likes(pub u8);
 
 module!(pub Map { kinds: [Room, Player, Item, Chest<R1>, Chest<R2>], relations: [In, At, Exit] });
 module!(pub Folk { kinds: [Npc], relations: [Likes] });

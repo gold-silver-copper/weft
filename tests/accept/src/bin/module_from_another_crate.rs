@@ -4,15 +4,13 @@
 use accept::{Bag, Holder, In, Item, Weight};
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room {
     pub name: &'static str,
 }
-kind!(Room);
 
 is!(Room: Holder); // set membership declared downstream
 

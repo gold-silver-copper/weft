@@ -2,22 +2,18 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room;
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [In])]
 pub struct Item;
-kind!(Item needs In);
 
-#[cfg(not(twin))]
-relation!(pub struct In: Item -> Room, one, detach); // ~ERROR E0080 "detach"
-#[cfg(twin)]
-relation!(pub struct In: Item -> Room, one, cascade);
+#[cfg_attr(not(twin), relation(Item -> Room, one, detach))] // ~ERROR "detach"
+#[cfg_attr(twin, relation(Item -> Room, one, cascade))]
+pub struct In;
 
 module!(pub Map { kinds: [Room, Item], relations: [In] });
 game!(pub Game: Settings [Map]);

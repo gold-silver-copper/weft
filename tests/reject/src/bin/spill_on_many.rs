@@ -2,18 +2,15 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root)]
 pub struct Settings;
-kind!(root Settings);
 
-#[derive(Debug)]
+#[kind]
 pub struct Npc;
-kind!(Npc);
 
-#[cfg(not(twin))]
-relation!(pub struct Likes(pub u8): Npc -> Npc, many, cyclic, spill); // ~ERROR E0080 "spill"
-#[cfg(twin)]
-relation!(pub struct Likes(pub u8): Npc -> Npc, many, cyclic, detach);
+#[cfg_attr(not(twin), relation(Npc -> Npc, many, cyclic, spill))] // ~ERROR "spill"
+#[cfg_attr(twin, relation(Npc -> Npc, many, cyclic, detach))]
+pub struct Likes(pub u8);
 
 module!(pub Folk { kinds: [Npc], relations: [Likes] });
 game!(pub Game: Settings [Folk]);

@@ -2,18 +2,15 @@
 #![feature(decl_macro)]
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root, needs = [Start])]
 pub struct Settings;
-kind!(root Settings needs Start);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room;
-kind!(Room);
 
-#[cfg(not(twin))]
-relation!(pub struct Start: Settings -> Room, one, cascade);
-#[cfg(twin)]
-relation!(pub struct Start: Settings -> Room, one, refuse);
+#[cfg_attr(not(twin), relation(Settings -> Room, one, cascade))]
+#[cfg_attr(twin, relation(Settings -> Room, one, refuse))]
+pub struct Start;
 
 module!(pub Map { kinds: [Room], relations: [Start] });
 game!(pub Game: Settings [Map]); // ~ERROR E0080 "root"

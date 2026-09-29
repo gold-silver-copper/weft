@@ -3,26 +3,26 @@
 use std::num::NonZeroU32;
 use weft::*;
 
-#[derive(Debug)]
+#[kind(root, needs = [Start])]
 pub struct Settings {
     pub seed: NonZeroU32,
 }
-kind!(root Settings needs Start);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room {
     pub number: NonZeroU32,
 }
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [Opens])]
 pub struct Key {
     pub teeth: NonZeroU32,
 }
-kind!(Key needs Opens);
 
-relation!(pub struct Start: Settings -> Room, one, refuse);
-relation!(pub struct Opens: Key -> Room, one, cascade);
+#[relation(Settings -> Room, one, refuse)]
+pub struct Start;
+
+#[relation(Key -> Room, one, cascade)]
+pub struct Opens;
 
 module!(pub Keys { kinds: [Room, Key], relations: [Start, Opens] });
 game!(pub Game: Settings [Keys]);

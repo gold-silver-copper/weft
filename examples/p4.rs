@@ -7,16 +7,18 @@ use weft::*;
 pub mod containers {
     use weft::*;
 
-    #[derive(Debug)]
+    #[kind(needs = [In])]
     pub struct Item {
         pub name: &'static str,
     }
-    kind!(Item needs In);
 
     set!(pub Holder);
 
-    relation!(pub struct In: Item -> Holder, one, cascade);
-    component!(pub struct Weight(pub u32): Item);
+    #[relation(Item -> Holder, one, cascade)]
+    pub struct In;
+
+    #[component(Item)]
+    pub struct Weight(pub u32);
 
     module!(pub Containers { kinds: [Item], relations: [In], components: [Weight] });
 
@@ -30,44 +32,46 @@ pub mod containers {
 
 use containers::{Holder, In, Item, Weight};
 
-#[derive(Debug)]
+#[kind(root, needs = [Plays])]
 pub struct Settings;
-kind!(root Settings needs Plays);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room {
     pub name: &'static str,
 }
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Player;
-kind!(Player needs At);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Npc {
     pub name: &'static str,
 }
-kind!(Npc needs At);
 
-#[derive(Debug)]
+#[kind(needs = [Opens])]
 pub struct Door {
     pub name: &'static str,
 }
-kind!(Door needs Opens);
 
 set!(pub Walker);
 is!(Player, Npc: Walker);
 is!(Room, Player, Npc: Holder); // plug this game's kinds into the module's set
 
-relation!(pub struct At: Walker -> Room, one, refuse);
-relation!(pub struct Plays: Settings -> Player, one, refuse);
-relation!(pub struct Opens: Door -> Room, one, cascade);
+#[relation(Walker -> Room, one, refuse)]
+pub struct At;
+
+#[relation(Settings -> Player, one, refuse)]
+pub struct Plays;
+
+#[relation(Door -> Room, one, cascade)]
+pub struct Opens;
 // The new relation, every rule in one line: an NPC guards at most one door (`opt`),
 // only NPCs guard and only doors are guarded, and a destroyed door just stops being guarded.
-relation!(pub struct Guards: Npc -> Door, opt, detach);
+#[relation(Npc -> Door, opt, detach)]
+pub struct Guards;
 // The new component: only items can be lit. No edit to `Item` or `containers`.
-component!(pub struct Lit(pub bool): Item);
+#[component(Item)]
+pub struct Lit(pub bool);
 
 module!(pub Town {
     kinds: [Room, Player, Npc, Door],

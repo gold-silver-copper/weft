@@ -11,18 +11,24 @@ A text game is a graph of relations: rooms, exits, what is in what, who likes wh
 - what a hook may touch is part of the signature of everything that can trigger it;
 - the rest, graph state no type can see, is refused at runtime with nothing changed.
 
-No `unsafe`, no dependencies, no panics. `src/lib.rs` forbids every panicking construct at `forbid` level, and `clippy.toml` bans the std APIs that panic on bad input.
+No `unsafe` and no panics. `src/lib.rs` forbids every panicking construct at `forbid` level, and `clippy.toml` bans the std APIs that panic on bad input. The runtime has no dependencies; the declaration macros live in `weft-macros`, built on `syn`, `quote`, `proc-macro2` and `darling`, the only third-party crates, approved by the owner and checked by `no_third_party_crates`.
 
 ## The pieces
 
 | declaration | what it makes |
 |---|---|
-| `kind!(Item rank 0 needs In)` | an entity kind: a struct whose data is fixed at spawn, its rank, and the `one` edges it can't exist without |
-| `set!(pub Holder)`, `is!(Room, Player: Holder)` | an open union of kinds, extendable from any crate |
-| `relation!(pub struct In: Thing -> Holder, one, ranked, spill)` | a relation: endpoints, arity (`one`/`opt`/`many`), shape (`->`/`<->`), loop rule (`ranked`/`cyclic`), despawn policy (`cascade`/`detach`/`spill`/`refuse`), optional `on_relate` hook |
-| `component!(pub struct Weight(pub u32): Item)` | changeable per-entity state |
+| `#[kind(needs = [In], rank = 0, is = [Thing])]` | an entity kind: a struct whose data is fixed at spawn, its rank, the `one` edges it can't exist without, and the sets it belongs to |
+| `set!(pub Holder)`, `is!(Room, Player: Holder)` | an open union of kinds, extendable from any crate (`is = [..]` on the kind, or `is!` anywhere) |
+| `#[relation(Thing -> Holder, one, ranked, spill)]` | a relation: endpoints, arity (`one`/`opt`/`many`), shape (`->`/`<->`), loop rule (`ranked`/`cyclic`), despawn policy (`cascade`/`detach`/`spill`/`refuse`), optional `on_relate` hook |
+| `#[component(Item)]` | changeable per-entity state |
 | `module!(pub Map { kinds: [..], relations: [..], components: [..] })` | a trait meaning "the game has all of this", and a macro `game!` calls by path |
 | `game!(pub Game: Settings [Map, other::Containers])` | the schema: storage for every part, `Has<X>` impls, and the declaration checks |
+
+## The macros
+
+`#[kind]`, `#[relation]` and `#[component]` are attributes on the struct they declare; `module!` and `game!` are function-like. All are proc macros in `weft-macros`, re-exported by `weft`, and they expand to paths under `::weft`. What they can check from the tokens alone, they check there and point at the offending token: `detach` on a `one` relation, `spill` on a `many` one, a `<->` that isn't `many`, a duplicate or unknown option, a rank that isn't the struct's parameter. What needs the whole crate graph (which kinds are in which sets, across crates) is left to `game!`'s const probes, below. A relation whose rules clash is still expanded as written next to its error, so one mistake is one error.
+
+A module can't be seen into from another crate, so `module!` also defines a macro (a `decl_macro`, so it has a path) that adds the module's parts to the list `game!` is building and hands it on. The parts keep the spans of the module that listed them, so they resolve where that module was declared. That macro is why crates that call `module!` enable `#![feature(decl_macro)]`; the library itself needs no nightly feature.
 
 ## Handles and total reads
 
@@ -48,7 +54,7 @@ Whether an operation can be refused is a type: `Fallibility` is `Sure` (the valu
 
 ## Declaration checks
 
-`game!` asks, for every pair of its kinds and relations, questions answered at `cargo check` by inherent associated consts that only exist when their bounds hold (option a's stable technique, which sees `is!` lines from every crate): does a kind that can be a `one` relation's source `need` it; do a loop-free relation's endpoints overlap; can the root be a `cascade` or `spill` source; can `one` edges form an ownership loop. `relation!` checks `detach` on `one`, `spill` on non-`one`, and two-way non-`many` the moment it's declared.
+`game!` asks, for every pair of its kinds and relations, questions answered at `cargo check` by inherent associated consts that only exist when their bounds hold (option a's stable technique, which sees `is!` lines from every crate): does a kind that can be a `one` relation's source `need` it; do a loop-free relation's endpoints overlap; can the root be a `cascade` or `spill` source; can `one` edges form an ownership loop. Each question is its own const, with a message naming the kinds and relation involved.
 
 ## Verification
 
@@ -63,8 +69,8 @@ Everything the decision record claims has a gate that fails when the claim is fa
 
 ## Limits
 
-- Nightly, for `decl_macro` (`module!` defines a macro that `game!` calls by path). The toolchain is pinned.
+- Nightly, for `decl_macro` in crates that call `module!` (it defines a macro that `game!` calls by path). The library itself compiles without nightly features. The toolchain is pinned.
 - Kind data is fixed at spawn; what changes lives in components. Set handles can't be indexed.
-- A kind needs at most four relations; a game has at most 128 kinds; `kind!` takes numeric ranks up to 15 (name a rank type for more).
+- A kind needs at most eight relations; a game has at most 128 kinds; numeric ranks run from 0 to 255 (`R0`–`R15` name the first sixteen).
 - Same-kind nesting needs ranks: two chests of the same rank can't nest, even where that wouldn't loop.
 - `one` edges keep their history until the world drops. Lookups are linear scans. Performance is a non-goal.

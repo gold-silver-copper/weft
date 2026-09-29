@@ -11,6 +11,7 @@ pub enum Difficulty {
 
 /// Game-wide settings are the root entity's data: one per world, always there,
 /// typed, and reachable from every turn with `t.settings()`.
+#[kind(root, needs = [Start, Plays])]
 #[derive(Debug, Default)]
 pub struct Settings {
     pub turn_limit: u32,
@@ -18,36 +19,30 @@ pub struct Settings {
 }
 // The starting room is an edge, not a field. `Start` refuses despawn, so the
 // setting can never name a room that's gone.
-kind!(root Settings needs Start, Plays);
 
-#[derive(Debug)]
+#[kind]
 pub struct Room {
     pub name: &'static str,
 }
-kind!(Room);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Player;
-kind!(Player needs At);
 
-#[derive(Debug)]
+#[kind(needs = [At])]
 pub struct Npc {
     pub name: &'static str,
 }
-kind!(Npc needs At);
 
-#[derive(Debug)]
+#[kind(needs = [In], rank = 0)]
 pub struct Item {
     pub name: &'static str,
 }
-kind!(Item rank 0 needs In);
 
-#[derive(Debug)]
+#[kind(needs = [In], rank = R)]
 pub struct Chest<R> {
     pub name: &'static str,
     pub rank: R,
 }
-kind!(Chest<R> rank R needs In);
 
 set!(pub Walker);
 is!(Player, Npc: Walker);
@@ -61,16 +56,26 @@ is!(Chest<R>: Thing, Holder);
 
 // Each relation's rules are chosen where it's declared.
 // Two-way (`<->`): relate takes both labels, unrelate removes both.
-relation!(pub struct Exit(pub &'static str): Room <-> Room, many, cyclic, detach);
+#[relation(Room <-> Room, many, cyclic, detach)]
+pub struct Exit(pub &'static str);
 // One-way (`->`): a chute you can't climb back up.
-relation!(pub struct Chute: Room -> Room, many, cyclic, detach);
+#[relation(Room -> Room, many, cyclic, detach)]
+pub struct Chute;
 // Destroying a chest spills its contents into whatever held it.
-relation!(pub struct In: Thing -> Holder, one, ranked, spill);
+#[relation(Thing -> Holder, one, ranked, spill)]
+pub struct In;
 // A room with someone standing in it can't be destroyed. Arriving runs `arrive`.
-relation!(pub struct At: Walker -> Room, one, refuse, on_relate = arrive: Map);
-relation!(pub struct Start: Settings -> Room, one, refuse);
-relation!(pub struct Plays: Settings -> Player, one, refuse);
-relation!(pub struct Likes(pub u8): Npc -> Npc, many, cyclic, detach);
+#[relation(Walker -> Room, one, refuse, on_relate = arrive: Map)]
+pub struct At;
+
+#[relation(Settings -> Room, one, refuse)]
+pub struct Start;
+
+#[relation(Settings -> Player, one, refuse)]
+pub struct Plays;
+
+#[relation(Npc -> Npc, many, cyclic, detach)]
+pub struct Likes(pub u8);
 
 module!(pub Map { kinds: [Room, Player], relations: [Exit, Chute, At, Start, Plays] });
 module!(pub Containers { kinds: [Item, Chest<R1>], relations: [In] });

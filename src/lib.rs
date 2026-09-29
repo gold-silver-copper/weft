@@ -1,7 +1,7 @@
 //! A typed entity-relation graph for text games, where invalid states don't compile.
 //!
-//! A game is kinds (`kind!`), open sets of kinds (`set!`, `is!`), relations between them
-//! (`relation!`) and components (`component!`), grouped into modules (`module!`) and put
+//! A game is kinds (`#[kind]`), open sets of kinds (`set!`, `is!`), relations between them
+//! (`#[relation]`) and components (`#[component]`), grouped into modules (`module!`) and put
 //! together by `game!`. A `World` of that game changes only in turns, and every rule it keeps
 //! is a type where Rust allows one:
 //!
@@ -22,32 +22,32 @@
 //!   kind doesn't `need`, overlapping endpoints without a loop rule, `cascade` or `spill` from
 //!   the root, and `one` edges that could let an entity own itself.
 //!
-//! Safe Rust only, no dependencies, and no panics: runtime refusals are `Refused`, and `Sure`
-//! operations return their value bare. Nightly, for `decl_macro` only: crates that call
-//! `module!` enable `#![feature(decl_macro)]`.
+//! Safe Rust only, and no panics: runtime refusals are `Refused`, and `Sure` operations return
+//! their value bare. The library itself needs no nightly feature; crates that call `module!`
+//! enable `#![feature(decl_macro)]`, because a module defines a macro `game!` calls by path.
 //!
 //! ```
 //! #![feature(decl_macro)]
 //! use weft::*;
 //!
-//! #[derive(Debug)]
+//! #[kind(root)]
 //! pub struct Settings;
-//! kind!(root Settings);
 //!
-//! #[derive(Debug)]
+//! #[kind]
 //! pub struct Room {
 //!     pub name: &'static str,
 //! }
-//! kind!(Room);
 //!
-//! #[derive(Debug)]
+//! #[kind(needs = [In])] // an item is always somewhere
 //! pub struct Item {
 //!     pub name: &'static str,
 //! }
-//! kind!(Item needs In); // an item is always somewhere
 //!
-//! relation!(pub struct In: Item -> Room, one, cascade);
-//! relation!(pub struct Exit(pub &'static str): Room <-> Room, many, cyclic, detach);
+//! #[relation(Item -> Room, one, cascade)]
+//! pub struct In;
+//!
+//! #[relation(Room <-> Room, many, cyclic, detach)]
+//! pub struct Exit(pub &'static str);
 //!
 //! module!(pub Map { kinds: [Room, Item], relations: [In, Exit] });
 //! game!(pub Game: Settings [Map]);
@@ -73,7 +73,6 @@
 //!
 //! The design and its trade-offs: `DESIGN.md`, and the decision records in `docs/design/`.
 
-#![feature(decl_macro)]
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![forbid(
@@ -122,6 +121,7 @@ pub use relation::{
 };
 pub use schema::{Has, Schema};
 pub use turn::{Genesis, Live, Needs, Phase, Turn};
+pub use weft_macros::{component, game, kind, module, relation};
 pub use world::World;
 
 /// What the macros expand to. Not part of the API.
@@ -137,15 +137,10 @@ pub mod __private {
     pub use crate::probe::{Otherwise, Probe, nth, owns_itself};
     pub use crate::rank::Below;
     pub use crate::relation::{
-        Arity, Link, RelLog, check_relation, __link_many as link_many, __link_one as link_one, __link_opt as link_opt,
+        Arity, Link, RelLog, __link_many as link_many, __link_one as link_one, __link_opt as link_opt,
         __one_way_sources as one_way_sources, __one_way_targets as one_way_targets, __read_one as read_one,
         __read_opt as read_opt, __two_way as two_way,
     };
     pub use crate::schema::{Owned, Part, Shared, Side};
-
-    /// `(A, (B, (C, ())))` from `A, B, C,`.
-    pub macro hlist {
-        () => { () },
-        ($a:ty, $($rest:ty,)*) => { ($a, $crate::__private::hlist!($($rest,)*)) },
-    }
+    pub use weft_macros::__game_step as game_step;
 }
