@@ -1,0 +1,26 @@
+# Everything that can panic at runtime, beyond what the forbid-level lints in
+# src/lib.rs already catch.
+disallowed-macros = [
+    { path = "core::assert", reason = "can panic" },
+    { path = "core::assert_eq", reason = "can panic" },
+    { path = "core::assert_ne", reason = "can panic" },
+    { path = "core::debug_assert", reason = "can panic" },
+    { path = "core::debug_assert_eq", reason = "can panic" },
+    { path = "core::debug_assert_ne", reason = "can panic" },
+]
+disallowed-methods = [
+    { path = "alloc::vec::Vec::remove", reason = "panics when out of bounds" },
+    { path = "alloc::vec::Vec::swap_remove", reason = "panics when out of bounds" },
+    { path = "alloc::vec::Vec::insert", reason = "panics when out of bounds" },
+    { path = "alloc::vec::Vec::split_off", reason = "panics when out of bounds" },
+    { path = "alloc::vec::Vec::drain", reason = "panics when out of bounds" },
+    { path = "alloc::collections::BTreeMap::range", reason = "panics on inverted ranges" },
+    { path = "core::iter::Iterator::sum", reason = "panics on overflow in debug builds" },
+    { path = "core::iter::Iterator::product", reason = "panics on overflow in debug builds" },
+    { path = "core::iter::Iterator::step_by", reason = "panics on a zero step" },
+    { path = "core::cell::RefCell::borrow", reason = "panics on conflicting borrows" },
+    { path = "core::cell::RefCell::borrow_mut", reason = "panics on conflicting borrows" },
+]
+disallowed-types = [
+    { path = "core::cell::RefCell", reason = "use the borrow checker instead of runtime borrow flags" },
+]
