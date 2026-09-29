@@ -43,10 +43,11 @@ pub struct Item {
 kind!(Item rank 0 needs In);
 
 #[derive(Debug)]
-pub struct Chest<const R: u8> {
+pub struct Chest<R> {
     pub name: &'static str,
+    pub rank: R,
 }
-kind!(Chest<const R: u8> rank R needs In);
+kind!(Chest<R> rank R needs In);
 
 set!(pub Walker);
 is!(Player, Npc: Walker);
@@ -55,8 +56,8 @@ is!(Item: Thing);
 set!(pub Holder);
 is!(Room, Player: Holder);
 // Nesting on: a chest is both a thing and a holder, and `ranked` keeps `In` loop-free at
-// compile time. To turn nesting off, drop this line and `Chest<1>` from `Containers`.
-is!(Chest<const R: u8>: Thing, Holder);
+// compile time. To turn nesting off, drop this line and `Chest<R1>` from `Containers`.
+is!(Chest<R>: Thing, Holder);
 
 // Each relation's rules are chosen where it's declared.
 // Two-way (`<->`): relate takes both labels, unrelate removes both.
@@ -72,7 +73,7 @@ relation!(pub struct Plays: Settings -> Player, one, refuse);
 relation!(pub struct Likes(pub u8): Npc -> Npc, many, cyclic, detach);
 
 module!(pub Map { kinds: [Room, Player], relations: [Exit, Chute, At, Start, Plays] });
-module!(pub Containers { kinds: [Item, Chest<1>], relations: [In] });
+module!(pub Containers { kinds: [Item, Chest<R1>], relations: [In] });
 module!(pub Folk { kinds: [Npc], relations: [Likes] });
 
 // Parts on or off: two games from the same modules.
@@ -95,7 +96,7 @@ where
         let pit = t.spawn(Room { name: "pit" }, ());
         t.relate(hall, Chute, pit);
         t.spawn(Item { name: "lamp" }, (In, hall));
-        let box_ = t.spawn(Chest::<1> { name: "box" }, (In, hall));
+        let box_ = t.spawn(Chest { name: "box", rank: R1 }, (In, hall));
         t.spawn(Item { name: "coin" }, (In, box_));
         let me = t.spawn(Player, (At, hall));
         t.spawn(settings, ((Start, hall), (Plays, me)))

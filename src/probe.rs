@@ -11,6 +11,7 @@ use std::marker::PhantomData;
 
 use crate::handle::Member;
 use crate::kind::{Carries, Kind};
+use crate::rank::Rank;
 use crate::relation::{Cascade, LoopRule, NoLoops, One, Relation, Spill};
 
 /// A question about the kind `K` and the relation `R`, or with `B`, about an edge of `R`
@@ -74,7 +75,7 @@ where
     B: Member<R::Target>,
 {
     #[allow(dead_code)]
-    pub const OWNS: bool = !<R::Loops as LoopRule>::RANKED || K::RANK < B::RANK;
+    pub const OWNS: bool = !<R::Loops as LoopRule>::RANKED || <K::Rank as Rank>::NUM < <B::Rank as Rank>::NUM;
 }
 
 /// `cascade` and `spill`: the policies that despawn or move the source.

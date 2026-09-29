@@ -10,7 +10,7 @@ kind!(root Settings needs Start, Plays);
 pub struct Room {
     pub name: &'static str,
 }
-kind!(Room); // rank 255 (the default): anything ranked lower fits in it
+kind!(Room); // rank `Top` (the default): anything ranked lower fits in it
 
 #[derive(Debug)]
 pub struct Player;
@@ -23,17 +23,18 @@ pub struct Item {
 kind!(Item rank 0 needs In); // holds nothing
 
 /// A container that can itself be put away. Its rank is in its type:
-/// a `Chest<2>` holds `Chest<1>`s and `Item`s, never another `Chest<2>`.
+/// a `Chest<R2>` holds `Chest<R1>`s and `Item`s, never another `Chest<R2>`.
 #[derive(Debug)]
-pub struct Chest<const R: u8> {
+pub struct Chest<R> {
     pub name: &'static str,
+    pub rank: R,
 }
-kind!(Chest<const R: u8> rank R needs In);
+kind!(Chest<R> rank R needs In);
 
 set!(pub Thing); // what can be put somewhere
 set!(pub Holder); // what things can be put in
 is!(Item: Thing);
-is!(Chest<const R: u8>: Thing, Holder);
+is!(Chest<R>: Thing, Holder);
 is!(Room, Player: Holder);
 
 // `Chest` is both a `Thing` and a `Holder`, so `In` could loop. `ranked` makes every edge
@@ -46,7 +47,7 @@ relation!(pub struct Start: Settings -> Room, one, refuse);
 relation!(pub struct Plays: Settings -> Player, one, refuse);
 
 module!(pub Keep {
-    kinds: [Room, Player, Item, Chest<1>, Chest<2>],
+    kinds: [Room, Player, Item, Chest<R1>, Chest<R2>],
     relations: [In, Exit, At, Start, Plays],
 });
 game!(pub Game: Settings [Keep]);
@@ -59,7 +60,7 @@ fn item<'t>(t: &Turn<'t, Game>, name: &str) -> Result<Id<'t, Item>, String> {
     t.all::<Item>().find(|&i| t[i].name == name).ok_or(format!("no item {name}"))
 }
 
-fn chest<'t, const R: u8>(t: &Turn<'t, Game>, name: &str) -> Result<Id<'t, Chest<R>>, String>
+fn chest<'t, R: Rank>(t: &Turn<'t, Game>, name: &str) -> Result<Id<'t, Chest<R>>, String>
 where
     Game: Has<Chest<R>>,
 {
@@ -71,8 +72,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         let hall = t.spawn(Room { name: "hall" }, ());
         let cellar = t.spawn(Room { name: "cellar" }, ());
         t.relate(hall, (Exit("down"), Exit("up")), cellar);
-        let big = t.spawn(Chest::<2> { name: "big chest" }, (In, hall));
-        let small = t.spawn(Chest::<1> { name: "small chest" }, (In, big));
+        let big = t.spawn(Chest { name: "big chest", rank: R2 }, (In, hall));
+        let small = t.spawn(Chest { name: "small chest", rank: R1 }, (In, big));
         t.spawn(Item { name: "coin" }, (In, small));
         t.spawn(Item { name: "key" }, (In, small));
         let me = t.spawn(Player, (At, hall));
@@ -82,7 +83,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     world.turn(|t| -> Result<(), Box<dyn Error>> {
         let (hall, cellar) = (room(t, "hall")?, room(t, "cellar")?);
-        let (big, small) = (chest::<2>(t, "big chest")?, chest::<1>(t, "small chest")?);
+        let (big, small) = (chest::<R2>(t, "big chest")?, chest::<R1>(t, "small chest")?);
         let key = item(t, "key")?;
 
         // 1. Move the outer chest. One edge changes; everything inside comes along.
@@ -93,8 +94,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         assert_eq!(t.sources::<In>(hall).count(), 0);
 
         // 2. Forbidden states don't compile, so there is nothing to refuse at runtime:
-        // t.relate(big, In, big);          // E0277: `Chest<2>` doesn't fit in `Chest<2>`: `In` is ranked
-        // t.relate(big, In, small);        // E0277: `Chest<2>` doesn't fit in `Chest<1>`: `In` is ranked
+        // t.relate(big, In, big);          // E0277: `Chest<R2>` doesn't fit in `Chest<R2>`: `In` is ranked
+        // t.relate(big, In, small);        // E0277: `Chest<R2>` doesn't fit in `Chest<R1>`: `In` is ranked
         // t.relate(cellar, In, big);       // E0277: `Room` is not a `Thing`
         // t.unrelate::<In>(big, cellar);   // E0277: `In` is `one`; move it, don't drop it
 
@@ -119,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     world.turn(|t| -> Result<(), Box<dyn Error>> {
         let hall = room(t, "hall")?;
         assert!(room(t, "cellar").is_err());
-        assert_eq!(t.all::<Chest<2>>().count() + t.all::<Chest<1>>().count(), 0);
+        assert_eq!(t.all::<Chest<R2>>().count() + t.all::<Chest<R1>>().count(), 0);
         let left: Vec<_> = t.all::<Item>().map(|i| t[i].name).collect();
         assert_eq!(left, ["key"]);
         assert_eq!(t.target::<In>(t.all::<Item>().next().ok_or("no key")?), hall);

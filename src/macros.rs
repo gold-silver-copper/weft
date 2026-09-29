@@ -3,21 +3,23 @@
 /// Declares an entity kind for a struct.
 ///
 /// ```text
-/// kind!(Room);                              // any number per world, rank 255
-/// kind!(Item rank 0 needs In);              // spawned only with its `In` edge
-/// kind!(Chest<const R: u8> rank R needs In); // one kind per rank
-/// kind!(root Settings needs Start, Plays);  // the root: one per world, its data is the settings
+/// kind!(Room);                             // any number per world, rank `Top`
+/// kind!(Item rank 0 needs In);             // spawned only with its `In` edge
+/// kind!(Chest<R> rank R needs In);         // one kind per rank: `Chest<R1>`, `Chest<R2>`
+/// kind!(root Settings needs Start, Plays); // the root: one per world, its data is the settings
 /// ```
 ///
-/// `needs` lists the kind's `one` relations, in the order `spawn` takes their edges. Every
-/// kind that can be the source of a `one` relation must need it (`game!` checks).
+/// `rank` is a number from 0 to 15, a rank type, or the struct's own type parameter (which
+/// its `rank` field then holds: `Chest { name: "box", rank: R1 }`). `needs` lists the kind's
+/// `one` relations, in the order `spawn` takes their edges. Every kind that can be the source
+/// of a `one` relation must need it; `game!` checks.
 #[macro_export]
 macro_rules! kind {
     (root $k:ident $(needs $($n:ident),+)?) => {
-        $crate::__kind!([] [$k] [] $k [255] $crate::__private::RootRole, (); $($($n),+)?);
+        $crate::__kind!([] [$k] [] $k [$crate::Top] $crate::__private::RootRole, (); $($($n),+)?);
     };
-    ($k:ident < const $p:ident : $pt:ty > $(rank $r:tt)? $(needs $($n:ident),+)?) => {
-        $crate::__kind!([const $p: $pt] [$k<$p>] [$p] $k [$crate::__rank!($($r)?)] $crate::__private::Plural, Self; $($($n),+)?);
+    ($k:ident < $p:ident > rank $r:ident $(needs $($n:ident),+)?) => {
+        $crate::__kind!([$p: $crate::Rank] [$k<$p>] [$p] $k [$r] $crate::__private::Plural, Self; $($($n),+)?);
     };
     ($k:ident $(rank $r:tt)? $(needs $($n:ident),+)?) => {
         $crate::__kind!([] [$k] [] $k [$crate::__rank!($($r)?)] $crate::__private::Plural, Self; $($($n),+)?);
@@ -27,11 +29,26 @@ macro_rules! kind {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __rank {
-    () => {
-        255
-    };
-    ($r:tt) => {
-        $r
+    () => { $crate::Top };
+    (0) => { $crate::R0 };
+    (1) => { $crate::R1 };
+    (2) => { $crate::R2 };
+    (3) => { $crate::R3 };
+    (4) => { $crate::R4 };
+    (5) => { $crate::R5 };
+    (6) => { $crate::R6 };
+    (7) => { $crate::R7 };
+    (8) => { $crate::R8 };
+    (9) => { $crate::R9 };
+    (10) => { $crate::R10 };
+    (11) => { $crate::R11 };
+    (12) => { $crate::R12 };
+    (13) => { $crate::R13 };
+    (14) => { $crate::R14 };
+    (15) => { $crate::R15 };
+    ($r:ident) => { $r };
+    ($r:literal) => {
+        ::core::compile_error!("`kind!` takes ranks from 0 to 15; for more, name a rank type such as `Up<R15>`")
     };
 }
 
@@ -44,13 +61,13 @@ macro_rules! __kind {
             type Store = $crate::__private::KindList<Self>;
         }
         impl<$($g)*> $crate::Kind for $($ty)* {
-            const RANK: u8 = $($rank)*;
+            type Rank = $($rank)*;
             type Role = $role;
             type Payload = $payload;
             type Links = ($($crate::__private::Rc<$crate::__private::OneSlot<$n>>,)*);
             fn write_name(f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
                 f.write_str(::core::stringify!($name))?;
-                $(::core::write!(f, "<{}>", $p)?;)?
+                $(::core::write!(f, "<{}>", <$p as $crate::Rank>::NUM)?;)?
                 ::core::result::Result::Ok(())
             }
         }
@@ -110,11 +127,11 @@ macro_rules! set {
     };
 }
 
-/// Puts kinds in sets: `is!(Room, Player: Holder)`, `is!(Chest<const R: u8>: Thing, Holder)`.
+/// Puts kinds in sets: `is!(Room, Player: Holder)`, `is!(Chest<R>: Thing, Holder)`.
 #[macro_export]
 macro_rules! is {
-    ($($k:ident $(< const $p:ident : $pt:ty >)?),+ : $($s:ident),+) => {
-        $crate::__is_each!{ [$($s),+] $($k $(< const $p : $pt >)?),+ }
+    ($($k:ident $(< $p:ident >)?),+ : $($s:ident),+) => {
+        $crate::__is_each!{ [$($s),+] $($k $(< $p >)?),+ }
     };
 }
 
@@ -122,9 +139,9 @@ macro_rules! is {
 #[macro_export]
 macro_rules! __is_each {
     ([$($s:ident),+]) => {};
-    ([$($s:ident),+] $k:ident < const $p:ident : $pt:ty > $(, $($rest:tt)*)?) => {
+    ([$($s:ident),+] $k:ident < $p:ident > $(, $($rest:tt)*)?) => {
         $(
-            impl<const $p: $pt> $crate::Member<$s> for $k<$p> {
+            impl<$p: $crate::Rank> $crate::Member<$s> for $k<$p> {
                 fn up<'t>(r: <Self as $crate::Handle>::Ref<'t>) -> &'t $crate::__private::Dyn {
                     r
                 }

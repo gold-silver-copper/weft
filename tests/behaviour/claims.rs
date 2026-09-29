@@ -132,7 +132,7 @@ fn lint_wall_is_intact() {
     assert!(lib.contains(WALL), "src/lib.rs no longer carries af02049's lint block byte for byte");
     for (line, text) in lib.lines().enumerate() {
         if text.trim_start().starts_with("#![") && !WALL.contains(text) {
-            let allowed = ["#![feature(generic_const_exprs, decl_macro)]", "#![allow(incomplete_features)]"];
+            let allowed = ["#![feature(decl_macro)]"];
             assert!(allowed.contains(&text.trim()), "src/lib.rs:{}: unexpected crate attribute `{text}`", line + 1);
         }
     }
@@ -220,8 +220,8 @@ pub mod estate {
     kind!(Hall);
 
     #[derive(Debug)]
-    pub struct Box_<const R: u8>(pub Tally, pub u32);
-    kind!(Box_<const R: u8> rank R needs Inside);
+    pub struct Box_<R>(pub Tally, pub u32, pub R);
+    kind!(Box_<R> rank R needs Inside);
 
     #[derive(Debug)]
     pub struct Heir(pub Tally, pub u32);
@@ -230,7 +230,7 @@ pub mod estate {
     set!(pub Holder);
     set!(pub Stuff);
     is!(Hall, Heir: Holder);
-    is!(Box_<const R: u8>: Holder, Stuff);
+    is!(Box_<R>: Holder, Stuff);
 
     relation!(pub struct Seat: Deeds -> Hall, one, refuse);
     relation!(pub struct Inside: Stuff -> Holder, one, ranked, cascade);
@@ -240,7 +240,7 @@ pub mod estate {
     component!(pub struct Worth(pub Tally): Heir);
 
     module!(pub Estate {
-        kinds: [Hall, Box_<0>, Box_<1>, Heir],
+        kinds: [Hall, Box_<R0>, Box_<R1>, Heir],
         relations: [Seat, Inside, Lives, Road, Envies],
         components: [Worth],
     });
@@ -261,8 +261,8 @@ fn drop_frees_everything() {
             t.relate(halls[3], (Road(7), Road(8)), halls[0]); // a cycle of roads
             for (i, &hall) in halls.iter().enumerate() {
                 let heir = t.spawn(Heir(Tally::new(), i as u32), (Lives, hall));
-                let outer = t.spawn(Box_::<1>(Tally::new(), i as u32), (Inside, hall));
-                t.spawn(Box_::<0>(Tally::new(), i as u32), (Inside, outer));
+                let outer = t.spawn(Box_(Tally::new(), i as u32, R1), (Inside, hall));
+                t.spawn(Box_(Tally::new(), i as u32, R0), (Inside, outer));
                 t.insert(heir, Worth(Tally::new()));
             }
             let heirs: Vec<_> = t.all::<Heir>().collect();
@@ -275,7 +275,7 @@ fn drop_frees_everything() {
             world.turn(|t| {
                 let halls: Vec<_> = t.all::<Hall>().collect();
                 let heirs: Vec<_> = t.all::<Heir>().collect();
-                let boxes: Vec<_> = t.all::<Box_<0>>().collect();
+                let boxes: Vec<_> = t.all::<Box_<R0>>().collect();
                 // Shuffle the small boxes between heirs and halls: every move grows a history.
                 for (i, &small) in boxes.iter().enumerate() {
                     let n = (i as u32 + round) as usize;
@@ -289,9 +289,9 @@ fn drop_frees_everything() {
                 if round % 10 == 0 {
                     // Spawn a few more, despawn a few: despawned entities count too.
                     let hall = halls[round as usize % halls.len()];
-                    let outer = t.spawn(Box_::<1>(Tally::new(), round), (Inside, hall));
-                    t.spawn(Box_::<0>(Tally::new(), round), (Inside, outer));
-                    let oldest = t.all::<Box_<1>>().next();
+                    let outer = t.spawn(Box_(Tally::new(), round, R1), (Inside, hall));
+                    t.spawn(Box_(Tally::new(), round, R0), (Inside, outer));
+                    let oldest = t.all::<Box_<R1>>().next();
                     if let Some(old) = oldest {
                         assert_eq!(t.despawn(old), Ok(()));
                     }

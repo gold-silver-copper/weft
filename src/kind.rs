@@ -15,8 +15,8 @@ use crate::schema::{Part, Schema, Shared};
 /// lives in components and edges.
 pub trait Kind: Part<Side = Shared, Store = KindList<Self>> + fmt::Debug + Sized + 'static {
     /// Where the kind stands in `ranked` relations: an edge of a ranked relation goes from a
-    /// lower rank to a strictly higher one. `255` unless `kind!` says `rank`.
-    const RANK: u8;
+    /// lower rank to a strictly higher one. `Top` unless `kind!` says `rank`.
+    type Rank: crate::rank::Rank;
     #[doc(hidden)]
     type Role: Role<Self>;
     #[doc(hidden)]

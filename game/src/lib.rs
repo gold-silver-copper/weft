@@ -23,10 +23,11 @@ pub struct Item {
 kind!(Item rank 0 needs In);
 
 #[derive(Debug)]
-pub struct Chest<const R: u8> {
+pub struct Chest<R> {
     pub name: &'static str,
+    pub rank: R,
 }
-kind!(Chest<const R: u8> rank R needs In);
+kind!(Chest<R> rank R needs In);
 
 #[derive(Debug)]
 pub struct Npc {
@@ -38,14 +39,14 @@ set!(pub Thing);
 is!(Item: Thing);
 set!(pub Holder);
 is!(Room, Player: Holder);
-is!(Chest<const R: u8>: Thing, Holder);
+is!(Chest<R>: Thing, Holder);
 
 relation!(pub struct In: Thing -> Holder, one, ranked, cascade);
 relation!(pub struct At: Player -> Room, one, refuse);
 relation!(pub struct Exit(pub &'static str): Room <-> Room, many, cyclic, detach);
 relation!(pub struct Likes(pub u8): Npc -> Npc, many, cyclic, detach);
 
-module!(pub Map { kinds: [Room, Player, Item, Chest<1>, Chest<2>], relations: [In, At, Exit] });
+module!(pub Map { kinds: [Room, Player, Item, Chest<R1>, Chest<R2>], relations: [In, At, Exit] });
 module!(pub Folk { kinds: [Npc], relations: [Likes] });
 game!(pub Game: Settings [Map, Folk]);
 
@@ -127,7 +128,7 @@ pub fn small<G: Map + Schema<Root = Settings>>() -> World<G> {
 /// use game::*;
 /// weft::World::<Game>::new(|t| {
 ///     let hall = t.spawn(Room { name: "hall" }, ());
-///     let chest = t.spawn(Chest::<1> { name: "chest" }, (In, hall));
+///     let chest = t.spawn(Chest { name: "chest", rank: weft::R1 }, (In, hall));
 ///     t.relate(hall, In, chest); // `Room` is not a `Thing`
 ///     t.spawn(Settings, ())
 /// });
@@ -137,8 +138,8 @@ pub fn small<G: Map + Schema<Root = Settings>>() -> World<G> {
 /// use game::*;
 /// weft::World::<Game>::new(|t| {
 ///     let hall = t.spawn(Room { name: "hall" }, ());
-///     let chest = t.spawn(Chest::<1> { name: "chest" }, (In, hall));
-///     t.relate(chest, In, chest); // `In` is ranked: `Chest<1>` only fits above rank 1
+///     let chest = t.spawn(Chest { name: "chest", rank: weft::R1 }, (In, hall));
+///     t.relate(chest, In, chest); // `In` is ranked: `Chest<R1>` only fits above rank 1
 ///     t.spawn(Settings, ())
 /// });
 /// ```
@@ -147,8 +148,8 @@ pub fn small<G: Map + Schema<Root = Settings>>() -> World<G> {
 /// use game::*;
 /// weft::World::<Game>::new(|t| {
 ///     let hall = t.spawn(Room { name: "hall" }, ());
-///     let big = t.spawn(Chest::<2> { name: "big" }, (In, hall));
-///     let small = t.spawn(Chest::<1> { name: "small" }, (In, big));
+///     let big = t.spawn(Chest { name: "big", rank: weft::R2 }, (In, hall));
+///     let small = t.spawn(Chest { name: "small", rank: weft::R1 }, (In, big));
 ///     t.relate(big, In, small); // rank 2 doesn't fit in rank 1
 ///     t.spawn(Settings, ())
 /// });
@@ -252,8 +253,8 @@ Item#0 Item { name: \"lamp\" }
         world.turn(|t| {
             let hall = t.all::<Room>().next().unwrap();
             let me = t.all::<Player>().next().unwrap();
-            let big = t.spawn(Chest::<2> { name: "big" }, (In, hall));
-            let small = t.spawn(Chest::<1> { name: "small" }, (In, big));
+            let big = t.spawn(Chest { name: "big", rank: R2 }, (In, hall));
+            let small = t.spawn(Chest { name: "small", rank: R1 }, (In, big));
             let coin = t.spawn(Item { name: "coin" }, (In, small));
             t.relate(big, In, me).unwrap();
             assert_eq!(t.ancestors::<In>(coin).collect::<Vec<_>>(), [small.up::<Holder>(), big.up(), me.up()]);
@@ -262,7 +263,7 @@ Item#0 Item { name: \"lamp\" }
         });
         world.check().unwrap();
         world.turn(|t| {
-            assert_eq!(t.all::<Chest<1>>().count(), 0);
+            assert_eq!(t.all::<Chest<R1>>().count(), 0);
             assert_eq!(t.all::<Item>().map(|i| t[i].name).collect::<Vec<_>>(), ["lamp"]);
         });
         world.check().unwrap();

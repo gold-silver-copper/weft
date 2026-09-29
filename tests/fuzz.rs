@@ -45,10 +45,11 @@ pub struct Item {
 kind!(Item rank 0 needs In);
 
 #[derive(Debug)]
-pub struct Chest<const R: u8> {
+pub struct Chest<R> {
     pub id: u32,
+    pub rank: R,
 }
-kind!(Chest<const R: u8> rank R needs In);
+kind!(Chest<R> rank R needs In);
 
 #[derive(Debug)]
 pub struct Coin {
@@ -59,7 +60,7 @@ kind!(Coin rank 0 needs Stash);
 set!(pub Thing);
 set!(pub Holder);
 is!(Item: Thing);
-is!(Chest<const R: u8>: Thing, Holder);
+is!(Chest<R>: Thing, Holder);
 is!(Room, Npc: Holder);
 
 // Things nest by rank and spill up when their holder goes; coins go with theirs.
@@ -75,7 +76,7 @@ relation!(pub struct Owns: Npc -> Item, many, refuse);
 component!(pub struct Weight(pub u32): Item);
 
 module!(pub Fz {
-    kinds: [Room, Npc, Item, Chest<1>, Chest<2>, Coin],
+    kinds: [Room, Npc, Item, Chest<R1>, Chest<R2>, Coin],
     relations: [In, Stash, Start, At, Exit, Likes, Guards, Owns],
     components: [Weight],
 });
@@ -359,8 +360,8 @@ struct Ids<'t> {
     rooms: BTreeMap<u32, Id<'t, Room>>,
     npcs: BTreeMap<u32, Id<'t, Npc>>,
     items: BTreeMap<u32, Id<'t, Item>>,
-    c1: BTreeMap<u32, Id<'t, Chest<1>>>,
-    c2: BTreeMap<u32, Id<'t, Chest<2>>>,
+    c1: BTreeMap<u32, Id<'t, Chest<R1>>>,
+    c2: BTreeMap<u32, Id<'t, Chest<R2>>>,
     coins: BTreeMap<u32, Id<'t, Coin>>,
 }
 
@@ -373,15 +374,15 @@ fn ids<'t>(t: &Turn<'t, Fuzz>) -> Result<Ids<'t>, String> {
     let rooms: BTreeMap<_, _> = t.all::<Room>().map(|x| (t[x].id, x)).collect();
     let npcs: BTreeMap<_, _> = t.all::<Npc>().map(|x| (t[x].id, x)).collect();
     let items: BTreeMap<_, _> = t.all::<Item>().map(|x| (t[x].id, x)).collect();
-    let c1: BTreeMap<_, _> = t.all::<Chest<1>>().map(|x| (t[x].id, x)).collect();
-    let c2: BTreeMap<_, _> = t.all::<Chest<2>>().map(|x| (t[x].id, x)).collect();
+    let c1: BTreeMap<_, _> = t.all::<Chest<R1>>().map(|x| (t[x].id, x)).collect();
+    let c2: BTreeMap<_, _> = t.all::<Chest<R2>>().map(|x| (t[x].id, x)).collect();
     let coins: BTreeMap<_, _> = t.all::<Coin>().map(|x| (t[x].id, x)).collect();
     let counts = [
         (K::Room, t.all::<Room>().count(), rooms.len()),
         (K::Npc, t.all::<Npc>().count(), npcs.len()),
         (K::Item, t.all::<Item>().count(), items.len()),
-        (K::Chest1, t.all::<Chest<1>>().count(), c1.len()),
-        (K::Chest2, t.all::<Chest<2>>().count(), c2.len()),
+        (K::Chest1, t.all::<Chest<R1>>().count(), c1.len()),
+        (K::Chest2, t.all::<Chest<R2>>().count(), c2.len()),
         (K::Coin, t.all::<Coin>().count(), coins.len()),
     ];
     for (k, listed, distinct) in counts {
@@ -403,9 +404,9 @@ fn holder_id<'t>(t: &Turn<'t, Fuzz>, h: Id<'t, Holder>) -> u32 {
         t[x].id
     } else if let Some(x) = t.cast::<Npc>(h) {
         t[x].id
-    } else if let Some(x) = t.cast::<Chest<1>>(h) {
+    } else if let Some(x) = t.cast::<Chest<R1>>(h) {
         t[x].id
-    } else if let Some(x) = t.cast::<Chest<2>>(h) {
+    } else if let Some(x) = t.cast::<Chest<R2>>(h) {
         t[x].id
     } else {
         panic!("a holder that is no holder kind: {h}")
@@ -415,9 +416,9 @@ fn holder_id<'t>(t: &Turn<'t, Fuzz>, h: Id<'t, Holder>) -> u32 {
 fn thing_id<'t>(t: &Turn<'t, Fuzz>, x: Id<'t, Thing>) -> u32 {
     if let Some(i) = t.cast::<Item>(x) {
         t[i].id
-    } else if let Some(c) = t.cast::<Chest<1>>(x) {
+    } else if let Some(c) = t.cast::<Chest<R1>>(x) {
         t[c].id
-    } else if let Some(c) = t.cast::<Chest<2>>(x) {
+    } else if let Some(c) = t.cast::<Chest<R2>>(x) {
         t[c].id
     } else {
         panic!("a thing that is no thing kind: {x}")
@@ -657,14 +658,14 @@ fn step(t: &mut Turn<'_, Fuzz>, m: &mut Model, rng: &mut Rng, stats: &mut Stats)
         }
         3 => {
             let Some(h) = rng.pick(&holders_above(m, 1)) else { return Ok(()) };
-            holder!(ids, h, [Room => rooms, Npc => npcs, Chest2 => c2], |to| t.spawn(Chest::<1> { id }, (In, to)));
+            holder!(ids, h, [Room => rooms, Npc => npcs, Chest2 => c2], |to| t.spawn(Chest { id, rank: R1 }, (In, to)));
             m.fresh(K::Chest1);
             m.inn.insert(id, h);
             stats.applied += 1;
         }
         4 => {
             let Some(h) = rng.pick(&holders_above(m, 2)) else { return Ok(()) };
-            holder!(ids, h, [Room => rooms, Npc => npcs], |to| t.spawn(Chest::<2> { id }, (In, to)));
+            holder!(ids, h, [Room => rooms, Npc => npcs], |to| t.spawn(Chest { id, rank: R2 }, (In, to)));
             m.fresh(K::Chest2);
             m.inn.insert(id, h);
             stats.applied += 1;

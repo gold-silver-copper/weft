@@ -30,10 +30,11 @@ pub struct Item {
 kind!(Item rank 0 needs In);
 
 #[derive(Debug)]
-pub struct Chest<const R: u8> {
+pub struct Chest<R> {
     pub name: &'static str,
+    pub rank: R,
 }
-kind!(Chest<const R: u8> rank R needs In);
+kind!(Chest<R> rank R needs In);
 
 set!(pub Walker);
 is!(Player, Npc: Walker);
@@ -41,7 +42,7 @@ set!(pub Thing);
 is!(Item: Thing);
 set!(pub Holder);
 is!(Room, Player: Holder);
-is!(Chest<const R: u8>: Thing, Holder);
+is!(Chest<R>: Thing, Holder);
 
 relation!(pub struct In: Thing -> Holder, one, ranked, spill);
 // The hook's bound is a whole module, not just `At`: it may move items through `In`.
@@ -51,7 +52,7 @@ relation!(pub struct Start: Settings -> Room, one, refuse);
 relation!(pub struct Plays: Settings -> Player, one, refuse);
 
 module!(pub Map {
-    kinds: [Room, Player, Npc, Item, Chest<1>],
+    kinds: [Room, Player, Npc, Item, Chest<R1>],
     relations: [In, At, Start, Plays],
 });
 game!(pub Game: Settings [Map]);
@@ -75,7 +76,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut world = World::<Game>::new(|t| {
         let hall = t.spawn(Room { name: "hall" }, ());
         let attic = t.spawn(Room { name: "attic" }, ());
-        let crate_ = t.spawn(Chest::<1> { name: "crate" }, (In, attic));
+        let crate_ = t.spawn(Chest { name: "crate", rank: R1 }, (In, attic));
         t.spawn(Item { name: "lamp" }, (In, attic));
         t.spawn(Item { name: "coin" }, (In, crate_));
         t.spawn(Npc { name: "ghost" }, (At, attic));
@@ -93,8 +94,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         assert_eq!(carried, ["lamp"]); // the crate stays: `pick_up` only takes `Item`s
 
         // A chest inside itself doesn't compile; a legal nesting does.
-        let crate_ = t.all::<Chest<1>>().next().ok_or("no crate")?;
-        // t.relate(crate_, In, crate_);  // E0277: `Chest<1>` doesn't fit in `Chest<1>`: `In` is ranked
+        let crate_ = t.all::<Chest<R1>>().next().ok_or("no crate")?;
+        // t.relate(crate_, In, crate_);  // E0277: `Chest<R1>` doesn't fit in `Chest<R1>`: `In` is ranked
 
         // Reads are total. The `one` edge is stored with the crate, so `target` is an `Id`,
         // not an `Option`, and there is no fallback row behind `t[..]`.
@@ -119,7 +120,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         let attic = attic(t)?;
         let coin = t.all::<Item>().find(|&i| t[i].name == "coin").ok_or("no coin")?;
         assert_eq!(t.target::<In>(coin), attic);
-        assert_eq!(t.all::<Chest<1>>().count(), 0);
+        assert_eq!(t.all::<Chest<R1>>().count(), 0);
         Ok(())
     })?;
     world.check()?;

@@ -2,8 +2,7 @@
 //!
 //! See `docs/design/0002-improve-ecs.md`.
 
-#![feature(generic_const_exprs, decl_macro)]
-#![allow(incomplete_features)]
+#![feature(decl_macro)]
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![forbid(
@@ -43,7 +42,9 @@ pub use component::Component;
 pub use graph::Broken;
 pub use handle::{Handle, Id, Is, Member, Narrow, Set};
 pub use kind::{Kind, Rooted};
-pub use rank::Fits;
+pub use rank::{
+    Fits, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, Rank, Top, Up, Zero,
+};
 pub use relation::{
     Allows, Arity, Cascade, Cyclic, Detach, Detachable, Fallibility, Holds, LoopRule, Many, NoLoops, OnRelate, One, Opt,
     PolicyKind, Ranked, Refuse, Refused, Relation, Single, Spill, Sure, TwoWay, Value,
@@ -63,6 +64,7 @@ pub mod __private {
     pub use crate::handle::{Dyn, Erased};
     pub use crate::kind::{Carries, KindList, Node, OneSlot, Plural, RootRole};
     pub use crate::probe::{Otherwise, Probe, nth, owns_itself};
+    pub use crate::rank::Below;
     pub use crate::relation::{
         Arity, Link, RelLog, check_relation, __link_many as link_many, __link_one as link_one, __link_opt as link_opt,
         __one_way_sources as one_way_sources, __one_way_targets as one_way_targets, __read_one as read_one,

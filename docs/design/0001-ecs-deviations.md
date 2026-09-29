@@ -50,3 +50,20 @@ handle_enters_other_turn: fails at Some(("src/bin/handle_enters_other_turn.rs", 
   (4) `<->` relations must be `many`: a two-way `one` or `opt` would need both ends replaced at once.
   (5) C17 needs the `one` edges between nodes to form no ownership loop, because nodes share each other through `Rc`: `game!` rejects `one` relations that could let a kind own itself, directly or through other kinds, unless the loop is `ranked` with rising ranks. A game has at most 128 kinds for that check.
 - Evidence: `tests/fuzz.rs` `differential` (60 worlds x 30 turns: 6817 ops applied, 403 refused, 348 of them held despawns), `hooks_settle`, and `tests/behaviour/claims.rs` `drop_frees_everything`, all passing.
+
+## D5: Ranks are types (Peano), not const generics
+- Kind: deviation
+- Files: examples/p3.rs, game/src/lib.rs, examples/p6.rs, examples/p7.rs, tests/fuzz.rs, tests/behaviour/claims.rs, tests/reject/src/lib.rs, tests/reject/src/bin/chest_in_itself.rs, tests/reject/src/bin/chest_in_its_contents.rs
+- Pins: examples/p3.rs 792e402492196dc1, game/src/lib.rs 0e18e55d88db0119, examples/p6.rs febe35b435faff26, examples/p7.rs c165775c0551d50b, tests/fuzz.rs 4e686c22e325bb12, tests/behaviour/claims.rs bfa1f4fe7a3932d4, tests/reject/src/lib.rs 1a0c140d0653e2e6, tests/reject/src/bin/chest_in_itself.rs e679a1f89993fe12, tests/reject/src/bin/chest_in_its_contents.rs b2fa1ae5ad67e56d
+- Claims: C5, C14, C15, C16
+- Why: C14 was red: the pinned rust-analyzer reported `??ty: 233`, and every one of them was a const-generic argument literal, the `1` in `Chest::<1>` and in every `Chest<1>` that `game!` expands. rust-analyzer doesn't type literal const arguments at all: a four-line program with no weft and no features reproduces it, on the pinned build and on stable 1.98.1. No spelling of the frozen programs that kept `Chest<const R: u8>` could reach `??ty: 0`. So ranks moved to types, as the prompt allows in advance: `Zero`, `Up<R>`, and `Top` for unranked kinds, with `R0`–`R15` naming the first sixteen as types and values; `ranked` compares them with a trait, `Below`, whose error still names both kinds and says `the relation is ranked, and ranks must rise`. weft no longer enables `generic_const_exprs`, only `decl_macro`, which also retires the record's toolchain risk (the feature's fall-back to the old trait solver) and makes rank errors trait errors that rust-analyzer shows natively, where before they showed only under `cargo check`. The cost is in the programs: a rank-generic kind holds its rank as a zero-sized field, so `Chest<const R: u8>` became `Chest<R>` with `pub rank: R`, `Chest::<2> { name }` became `Chest { name, rank: R2 }`, `Chest<1>` became `Chest<R1>`, and `const R: u8` in a signature became `R: Rank`. Numeric `rank 0` stays. The same rewrite applies to the gates that spell ranks, and `lint_wall_is_intact` now allows only `#![feature(decl_macro)]`.
+- Evidence: rust-analyzer before and after, and the reproduction.
+
+```text
+before:  exprs: 31256, ??ty: 233 (0%), ?ty: 0 (0%)   every unknown at a const argument, e.g. examples/p3.rs 74:34 (the 2 in Chest::<2>)
+after:   exprs: 31062, ??ty: 0 (0%), ?ty: 0 (0%)
+         pats: 4875, ??ty: 0 (0%), ?ty: 0 (0%)
+repro (no dependencies):  pub struct Chest<const R: u8> { pub id: u32 }  fn main() { let a = Chest::<1> { id: 3 }; let _ = a.id; }
+  rust-analyzer 1.100.0-nightly (bba531001 2026-09-20):  exprs: 6, ??ty: 1
+  rust-analyzer 1.98.1 (48a229ce 2026-09-01):            exprs: 6, ??ty: 1
+```

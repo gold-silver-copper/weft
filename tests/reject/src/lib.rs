@@ -17,7 +17,7 @@
 //! use game::*;
 //! weft::World::<Game>::new(|t| {
 //!     let hall = t.spawn(Room { name: "hall" }, ());
-//!     let chest = t.spawn(Chest::<1> { name: "chest" }, (In, hall));
+//!     let chest = t.spawn(Chest { name: "chest", rank: weft::R1 }, (In, hall));
 //!     t.relate(chest, In, chest);
 //!     t.spawn(Settings, ())
 //! });
