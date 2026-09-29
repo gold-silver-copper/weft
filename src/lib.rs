@@ -1,57 +1,78 @@
-//! A small entity component system where the compiler does the checking.
+//! A typed entity-relation graph for text games, where invalid states don't compile.
 //!
-//! - A [`schema!`] lists every component, relation and resource a [`World`]
-//!   can hold. Using anything else doesn't compile, resources always exist,
-//!   and only components marked `mut` can be changed in place.
-//! - Access follows Rust's borrowing rules, enforced at compile time.
-//!   [`World::query`] takes `&World`; [`World::query_mut`] takes
-//!   `&mut World` and lends columns out of a type-level list. Borrowing a
-//!   column mutably twice, or mutably and shared, is a type error.
-//! - [`Relation`]s are typed, valued edges. [`Many`] or [`One`] target per
-//!   source is part of the type, so asking for *the* target of a
-//!   many-to-many relation doesn't compile.
-//! - Nothing in the crate can panic. Fallible operations return `Result` or
-//!   `Option`, and infallible ones say so in their types: spawning a bundle
-//!   of components returns an `Entity`, spawning one with a relation returns
-//!   `Result<Entity, NoSuchEntity>`. This is enforced with `forbid`-level
-//!   lints against every panicking construct.
+//! A game is kinds (`#[kind]`), open sets of kinds (`set!`, `is!`), relations between them
+//! (`#[relation]`) and components (`#[component]`), grouped into modules (`module!`) and put
+//! together by `game!`. A `World` of that game changes only in turns, and every rule it keeps
+//! is a type where Rust allows one:
+//!
+//! - **Handles can't go stale.** `Id<'t, K>` is branded to its turn: it can't leave it or
+//!   enter another world's, so if a handle exists, its entity exists.
+//! - **Reads are total.** `t[id]` and `target` on a `one` relation read fields; there is no
+//!   `Option`, no fallback value, and kinds need no `Default`.
+//! - **Relations keep their shape.** Endpoints are typed; a `one` edge is given at spawn and
+//!   can only be moved; a two-way relation is one fact with a value for each end;
+//!   `ranked` relations can't loop, because every edge must go up in rank.
+//! - **Hooks declare their reach.** `on_relate = f: Bound` runs `f` on every new edge, and
+//!   every caller that relates the relation must meet `Bound`. Chains that never settle are
+//!   refused.
+//! - **Despawns are planned.** A despawn dooms its entity; `cascade`, `detach`, `spill` and
+//!   `refuse` decide what happens to the edges into it when the turn ends, and a despawn a
+//!   `refuse` edge would break is refused.
+//! - **`game!` checks the declarations** under `cargo check`: a `one` relation its source
+//!   kind doesn't `need`, overlapping endpoints without a loop rule, `cascade` or `spill` from
+//!   the root, and `one` edges that could let an entity own itself.
+//!
+//! Safe Rust only, and no panics: runtime refusals are `Refused`, and `Sure` operations return
+//! their value bare. The library itself needs no nightly feature; crates that call `module!`
+//! enable `#![feature(decl_macro)]`, because a module defines a macro `game!` calls by path.
 //!
 //! ```
+//! #![feature(decl_macro)]
 //! use weft::*;
 //!
-//! struct Pos(i32);
-//! impl<S: Schema> Component<S> for Pos {}
+//! #[kind(root)]
+//! pub struct Settings;
 //!
-//! struct Vel(i32);
-//! impl<S: Schema> Component<S> for Vel {}
-//!
-//! struct Likes(u32);
-//! impl<S: Schema> Relation<S> for Likes {
-//!     type Arity = Many;
+//! #[kind]
+//! pub struct Room {
+//!     pub name: &'static str,
 //! }
 //!
-//! schema! {
-//!     struct Game {
-//!         components: [mut Pos, Vel],
-//!         relations: [Likes, ChildOf],
-//!         resources: [],
-//!     }
+//! #[kind(needs = [In])] // an item is always somewhere
+//! pub struct Item {
+//!     pub name: &'static str,
 //! }
 //!
-//! let mut world = World::<Game>::new();
-//! let alice = world.spawn((Pos(0), Vel(1)));
-//! let bob = world.spawn((Pos(10), Vel(-1), To(Likes(3), alice)))?;
-//! world.relate(alice, Likes(5), bob)?;
+//! #[relation(Item -> Room, one, cascade)]
+//! pub struct In;
 //!
-//! world.query_mut::<(&mut Pos, &Vel)>().for_each(|(mut pos, vel)| pos.0 += vel.0);
+//! #[relation(Room <-> Room, many, cyclic, detach)]
+//! pub struct Exit(pub &'static str);
 //!
-//! assert_eq!(world.get::<Pos>(alice).map(|p| p.0), Some(1));
-//! assert_eq!(world.targets::<Likes>(bob), [alice]);
-//! assert_eq!(world.relation::<Likes>(alice, bob).map(|l| l.0), Some(5));
-//! # Ok::<(), NoSuchEntity>(())
+//! module!(pub Map { kinds: [Room, Item], relations: [In, Exit] });
+//! game!(pub Game: Settings [Map]);
+//!
+//! let mut world = World::<Game>::new(|t| {
+//!     let hall = t.spawn(Room { name: "hall" }, ());
+//!     let cellar = t.spawn(Room { name: "cellar" }, ());
+//!     t.relate(hall, (Exit("down"), Exit("up")), cellar);
+//!     t.spawn(Item { name: "lamp" }, (In, hall));
+//!     t.spawn(Settings, ())
+//! });
+//!
+//! let moved = world.turn(|t| {
+//!     let lamp = t.all::<Item>().next()?;
+//!     let here = t.target::<In>(lamp); // an `Id`, not an `Option`
+//!     let (down, _) = t.targets::<Exit>(here).next()?;
+//!     t.relate(lamp, In, down).ok()?; // `In` is `one`: relating again moves it
+//!     Some(t[t.target::<In>(lamp)].name)
+//! });
+//! assert_eq!(moved, Some("cellar"));
+//! assert_eq!(world.check(), Ok(()));
 //! ```
+//!
+//! The design and its trade-offs: `DESIGN.md`, and the decision records in `docs/design/`.
 
-#![no_std]
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 #![forbid(
@@ -74,38 +95,52 @@
     clippy::disallowed_types
 )]
 
-extern crate alloc;
-
-mod bundle;
+mod chain;
 mod component;
-mod entity;
-mod event;
-mod query;
+mod graph;
+mod handle;
+mod kind;
+mod macros;
+mod probe;
+mod rank;
 mod relation;
-mod schedule;
 mod schema;
+mod turn;
 mod world;
 
-pub use bundle::{Bundle, Outcome};
-pub use component::{Component, Mut, Requires};
-pub use entity::{Entity, NoSuchEntity};
-pub use event::{EntityEvent, Event, ObserverId, On};
-pub use query::{
-    Added, BorrowQuery, Borrows, Changed, Filter, HasSource, HasTarget, Not, Or, Query, QueryData, QueryIter, QueryMut, ReadQuery,
-    Sources, Targets, View, With, Without,
+pub use component::Component;
+pub use graph::Broken;
+pub use handle::{Handle, Id, Is, Member, Narrow, Set};
+pub use kind::{Kind, Rooted};
+pub use rank::{
+    Fits, R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, Rank, Top, Up, Zero,
 };
-pub use relation::{Arity, ChildOf, Many, One, Relation, To, Traverse};
-pub use schedule::Schedule;
-pub use schema::{Links, Owns, Reads, Schema, Writes};
+pub use relation::{
+    Allows, Arity, Cascade, Cyclic, Detach, Detachable, Fallibility, Holds, LoopRule, Many, NoLoops, OnRelate, One, Opt,
+    PolicyKind, Ranked, Refuse, Refused, Relation, Single, Spill, Sure, TwoWay, Value,
+};
+pub use schema::{Has, Schema};
+pub use turn::{Genesis, Live, Needs, Phase, Turn};
+pub use weft_macros::{component, game, kind, module, relation};
 pub use world::World;
 
-/// Machinery that appears in trait signatures and macro output. Not meant to
-/// be used directly.
+/// What the macros expand to. Not part of the API.
 #[doc(hidden)]
-pub mod internal {
-    pub use crate::bundle::{IsComponent, IsRelation, Lift};
-    pub use crate::component::{Column, Tick};
-    pub use crate::query::{Candidates, Context, Term};
-    pub use crate::relation::Edges;
-    pub use crate::schema::{At, Columns, Lend, LendMut, Loans, Peek, Relations, Shared, Slot, Succ, Taken, Zero};
+pub mod __private {
+    pub use std::boxed::Box;
+    pub use std::rc::Rc;
+    pub use std::vec::Vec;
+
+    pub use crate::graph::Table;
+    pub use crate::handle::{Dyn, Erased};
+    pub use crate::kind::{Carries, KindList, Node, OneSlot, Plural, RootRole};
+    pub use crate::probe::{Otherwise, Probe, nth, owns_itself};
+    pub use crate::rank::Below;
+    pub use crate::relation::{
+        Arity, Link, RelLog, __link_many as link_many, __link_one as link_one, __link_opt as link_opt,
+        __one_way_sources as one_way_sources, __one_way_targets as one_way_targets, __read_one as read_one,
+        __read_opt as read_opt, __two_way as two_way,
+    };
+    pub use crate::schema::{Owned, Part, Shared, Side};
+    pub use weft_macros::__game_step as game_step;
 }

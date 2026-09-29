@@ -1,0 +1,15 @@
+[package]
+name = "reject"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+weft = { path = "../.." }
+game = { path = "../../game" }
+
+# Detached: `tests/cases.rs` checks this package on its own.
+[workspace]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(twin)'] }
