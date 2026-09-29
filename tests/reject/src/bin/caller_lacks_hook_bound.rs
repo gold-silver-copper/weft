@@ -54,8 +54,11 @@ fn main() {
         t.spawn(Player, (At, hall));
         t.spawn(Settings, ())
     });
-    let _ = world.turn(|t| match (t.all::<Player>().next(), t.all::<Room>().next()) {
-        (Some(me), Some(room)) => walk(t, me, room),
-        _ => Ok(()),
+    let _ = world.turn(|t| {
+        let (me, room) = (t.all::<Player>().next(), t.all::<Room>().next());
+        match (me, room) {
+            (Some(me), Some(room)) => walk(t, me, room),
+            _ => Ok(()),
+        }
     });
 }

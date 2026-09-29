@@ -1,6 +1,6 @@
 //! A typed entity-relation graph for text games, where invalid states don't compile.
 //!
-//! The library is being rebuilt against `docs/design/0002-improve-ecs.md`.
+//! See `docs/design/0002-improve-ecs.md`.
 
 #![feature(generic_const_exprs, decl_macro)]
 #![allow(incomplete_features)]
@@ -25,3 +25,54 @@
     clippy::disallowed_methods,
     clippy::disallowed_types
 )]
+
+mod chain;
+mod component;
+mod graph;
+mod handle;
+mod kind;
+mod macros;
+mod probe;
+mod rank;
+mod relation;
+mod schema;
+mod turn;
+mod world;
+
+pub use component::Component;
+pub use graph::Broken;
+pub use handle::{Handle, Id, Is, Member, Narrow, Set};
+pub use kind::{Kind, Rooted};
+pub use rank::Fits;
+pub use relation::{
+    Allows, Arity, Cascade, Cyclic, Detach, Detachable, Fallibility, Holds, LoopRule, Many, NoLoops, OnRelate, One, Opt,
+    PolicyKind, Ranked, Refuse, Refused, Relation, Single, Spill, Sure, TwoWay, Value,
+};
+pub use schema::{Has, Schema};
+pub use turn::{Genesis, Live, Needs, Phase, Turn};
+pub use world::World;
+
+/// What the macros expand to. Not part of the API.
+#[doc(hidden)]
+pub mod __private {
+    pub use std::boxed::Box;
+    pub use std::rc::Rc;
+    pub use std::vec::Vec;
+
+    pub use crate::graph::Table;
+    pub use crate::handle::{Dyn, Erased};
+    pub use crate::kind::{Carries, KindList, Node, OneSlot, Plural, RootRole};
+    pub use crate::probe::{Otherwise, Probe, nth, owns_itself};
+    pub use crate::relation::{
+        Arity, Link, RelLog, check_relation, __link_many as link_many, __link_one as link_one, __link_opt as link_opt,
+        __one_way_sources as one_way_sources, __one_way_targets as one_way_targets, __read_one as read_one,
+        __read_opt as read_opt, __two_way as two_way,
+    };
+    pub use crate::schema::{Owned, Part, Shared, Side};
+
+    /// `(A, (B, (C, ())))` from `A, B, C,`.
+    pub macro hlist {
+        () => { () },
+        ($a:ty, $($rest:ty,)*) => { ($a, $crate::__private::hlist!($($rest,)*)) },
+    }
+}
